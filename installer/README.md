@@ -41,11 +41,11 @@ This installer automates the complete LogOS installation process from bare metal
 #### 2. Download the Installer
 
 ```bash
-# VM OR ETHERNET - BARE METAL:
+# BARE METAL - ETHERNET OR VM:
 ping archlinux.org # to ensure you have a connection (do not copy this comment).
 # then ctrl+c (to stop pinging if successfully receiving a response)
 
-# WIFI - BARE METAL
+# BARE METAL - WIFI
 # Connect to network (if using WiFi)
 iwctl
 # In iwctl prompt:
