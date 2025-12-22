@@ -1,0 +1,32 @@
+# /etc/fstab: static file system information
+# <file system> <mount point>   <type>  <options>       <dump>  <pass>
+
+# EFI System Partition
+UUID=__EFI_UUID__    /boot/efi    vfat    defaults,noatime,fmask=0137,dmask=0027    0    2
+
+# Boot partition (unencrypted)
+UUID=__BOOT_UUID__   /boot        ext4    defaults,noatime    0    2
+
+# Root filesystem (Btrfs on LUKS)
+UUID=__BTRFS_UUID__  /            btrfs   subvol=@,noatime,compress=zstd:3,space_cache=v2,discard=async    0    0
+
+# Home (user data)
+UUID=__BTRFS_UUID__  /home        btrfs   subvol=@home,noatime,compress=zstd:3,space_cache=v2,discard=async    0    0
+
+# Snapshots
+UUID=__BTRFS_UUID__  /.snapshots  btrfs   subvol=@snapshots,noatime,compress=zstd:3,space_cache=v2,discard=async    0    0
+
+# Logs
+UUID=__BTRFS_UUID__  /var/log     btrfs   subvol=@log,noatime,compress=zstd:1,space_cache=v2,discard=async    0    0
+
+# Cache
+UUID=__BTRFS_UUID__  /var/cache   btrfs   subvol=@cache,noatime,compress=zstd:1,space_cache=v2,discard=async    0    0
+
+# Cold Canon (knowledge preservation with copies=2 for bitrot protection)
+UUID=__BTRFS_UUID__  /home/__USERNAME__/Documents    btrfs   subvol=@canon,noatime,compress=zstd:9,space_cache=v2,discard=async,copies=2    0    0
+
+# Warm Mesh (collaboration sync)
+UUID=__BTRFS_UUID__  /home/__USERNAME__/Sync         btrfs   subvol=@mesh,noatime,compress=zstd:3,space_cache=v2,discard=async    0    0
+
+# Swap (zram - configured via systemd)
+# See /etc/systemd/zram-generator.conf
