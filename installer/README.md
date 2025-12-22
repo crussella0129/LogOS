@@ -15,6 +15,7 @@ This installer automates the complete LogOS installation process from bare metal
 - 📦 **Btrfs with Snapshots**: Automatic snapshots, rollback capability, bitrot protection
 - 🎨 **Multiple Desktop Environments**: GNOME, KDE, XFCE, i3-wm, or headless
 - ⚡ **GPU Support**: AMD (recommended), NVIDIA, Intel auto-detection
+- 🎭 **Professional Branding**: Custom GRUB boot splash and desktop wallpaper with LogOS logo
 - 🔧 **Specialized Tools**: CAD, 3D printing, gaming, security research, scientific computing, and more
 
 ## Quick Start
