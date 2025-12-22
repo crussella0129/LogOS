@@ -16,6 +16,9 @@ configure_system_chroot() {
     # Set hostname
     configure_hostname
 
+    # Configure OS branding
+    configure_os_branding
+
     # Configure users
     configure_users
 
@@ -68,6 +71,39 @@ configure_hostname() {
 EOF
 
     success "Hostname configured"
+}
+
+configure_os_branding() {
+    log "Configuring LogOS branding..."
+
+    # Install /etc/os-release
+    if [[ -f "${SCRIPT_DIR}/templates/os-release.template" ]]; then
+        cp "${SCRIPT_DIR}/templates/os-release.template" /mnt/etc/os-release
+        success "/etc/os-release installed"
+    else
+        warning "os-release template not found, using default"
+    fi
+
+    # Install /etc/issue (console login banner)
+    if [[ -f "${SCRIPT_DIR}/templates/issue.template" ]]; then
+        cp "${SCRIPT_DIR}/templates/issue.template" /mnt/etc/issue
+        success "/etc/issue installed"
+    else
+        warning "issue template not found, using default"
+    fi
+
+    # Configure bash prompt with LogOS branding
+    cat > /mnt/etc/profile.d/logos-prompt.sh <<'EOF'
+# LogOS bash prompt configuration
+if [ -n "$BASH_VERSION" ]; then
+    # Set PS1 to show "LogOS:" prefix
+    PS1='LogOS: \u@\h:\w\$ '
+fi
+EOF
+    chmod +x /mnt/etc/profile.d/logos-prompt.sh
+    success "LogOS prompt configured"
+
+    success "LogOS branding configured"
 }
 
 configure_users() {

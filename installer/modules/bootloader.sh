@@ -30,7 +30,7 @@ install_bootloader() {
 GRUB_DEFAULT=saved
 GRUB_SAVEDEFAULT=true
 GRUB_TIMEOUT=10
-GRUB_DISTRIBUTOR="LogOS"
+GRUB_DISTRIBUTOR="Arch"
 GRUB_CMDLINE_LINUX_DEFAULT=""
 GRUB_CMDLINE_LINUX="cryptdevice=UUID=$crypt_uuid:cryptroot root=/dev/mapper/cryptroot"
 GRUB_ENABLE_CRYPTODISK=y

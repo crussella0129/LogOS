@@ -1,0 +1,11 @@
+NAME="LogOS Linux x86"
+PRETTY_NAME="LogOS Linux x86"
+ID=arch
+ID_LIKE=arch
+BUILD_ID=rolling
+ANSI_COLOR="38;2;23;147;209"
+HOME_URL="https://github.com/crussella0129/LogOS"
+DOCUMENTATION_URL="https://github.com/crussella0129/LogOS"
+SUPPORT_URL="https://github.com/crussella0129/LogOS/issues"
+BUG_REPORT_URL="https://github.com/crussella0129/LogOS/issues"
+LOGO=archlinux
