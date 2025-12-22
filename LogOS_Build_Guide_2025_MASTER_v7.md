@@ -182,7 +182,7 @@ Honesty about limitations is essential:
 ---
 ## 2. Hardware Compatibility Matrix
 
-### 2.1 Tested Hardware
+### 2.1 Anticipated Hardware Compatibility
 
 | Hardware | Status | Secure Boot | Issues | Notes |
 |----------|--------|-------------|--------|-------|
