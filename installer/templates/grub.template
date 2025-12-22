@@ -9,7 +9,7 @@ GRUB_SAVEDEFAULT=true
 GRUB_TIMEOUT=10
 
 # Distributor
-GRUB_DISTRIBUTOR="LogOS"
+GRUB_DISTRIBUTOR="Arch"
 
 # Kernel command line (profile-specific params added dynamically)
 GRUB_CMDLINE_LINUX_DEFAULT=""
