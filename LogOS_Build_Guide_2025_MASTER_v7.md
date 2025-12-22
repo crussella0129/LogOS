@@ -17,7 +17,7 @@ LogOS ("Logos" + "OS") is an **Ontology Substrate** operating system—a foundat
 > *"In the beginning was the Logos, and the Logos was with God, and the Logos was God."*  
 > — John 1:1  
 >  
-> Whether one reads this theologically or philosophically, the implication is clear: reason, structure, and creative word are foundational to existence itself. LogOS aspires to be a substrate worthy of that heritage—a system that preserves not merely data, but the capacity to *reason about* and *act upon* that data.
+Whether one reads this theologically or philosophically, the implication is clear: reason, structure, and creative word are foundational to existence itself. LogOS aspires to be a substrate worthy of that heritage—a system that preserves not merely data, but the capacity to *reason about* and *act upon* that data.
 
 ### Core Design Tenets
 
