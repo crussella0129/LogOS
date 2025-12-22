@@ -21,6 +21,9 @@ install_bootloader() {
     echo "$crypt_uuid" > /mnt/tmp/crypt_uuid
     echo "$btrfs_uuid" > /mnt/tmp/btrfs_uuid
 
+    # Install LogOS boot branding
+    install_grub_branding
+
     # Configure GRUB defaults
     cat > /mnt/etc/default/grub <<EOF
 # GRUB defaults for LogOS
@@ -32,8 +35,10 @@ GRUB_CMDLINE_LINUX_DEFAULT=""
 GRUB_CMDLINE_LINUX="cryptdevice=UUID=$crypt_uuid:cryptroot root=/dev/mapper/cryptroot"
 GRUB_ENABLE_CRYPTODISK=y
 GRUB_DISABLE_OS_PROBER=false
-GRUB_GFXMODE=auto
+GRUB_GFXMODE=1920x1080,1024x768,auto
 GRUB_GFXPAYLOAD_LINUX=keep
+GRUB_BACKGROUND="/boot/grub/themes/logos/logos-boot.png"
+GRUB_THEME="/boot/grub/themes/logos/theme.txt"
 EOF
 
     success "GRUB configuration created"
@@ -43,6 +48,59 @@ EOF
     arch_chroot "grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=LogOS --recheck"
 
     success "GRUB installed"
+}
+
+install_grub_branding() {
+    log "Installing LogOS boot branding..."
+
+    # Create GRUB theme directory
+    mkdir -p /mnt/boot/grub/themes/logos
+
+    # Copy boot splash image from installer assets
+    if [[ -f "${SCRIPT_DIR}/assets/branding/logos-boot.png" ]]; then
+        cp "${SCRIPT_DIR}/assets/branding/logos-boot.png" /mnt/boot/grub/themes/logos/
+        success "Boot splash image installed"
+    else
+        warning "Boot splash image not found in installer assets"
+    fi
+
+    # Create GRUB theme configuration
+    cat > /mnt/boot/grub/themes/logos/theme.txt <<'EOF'
+# LogOS GRUB Theme
+# Based on the Ringed City architecture
+
+# Boot menu appearance
+desktop-image: "logos-boot.png"
+title-text: ""
+terminal-font: "Terminus Regular 16"
+
+# Colors (Dark theme with LogOS branding)
+terminal-box: "terminal_box_*.png"
++ boot_menu {
+  left = 15%
+  top = 30%
+  width = 70%
+  height = 50%
+  item_color = "#f0f0f0"
+  selected_item_color = "#ffffff"
+  item_height = 32
+  item_padding = 8
+  item_spacing = 4
+  selected_item_pixmap_style = "select_*.png"
+}
+
++ label {
+  top = 85%
+  left = 0
+  width = 100%
+  height = 20
+  text = "LogOS - Ontology Substrate Operating System"
+  color = "#cccccc"
+  align = "center"
+}
+EOF
+
+    success "GRUB theme configured"
 }
 
 create_ringed_city_profiles() {

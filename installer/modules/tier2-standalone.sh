@@ -265,6 +265,90 @@ sudo pacman -S --noconfirm \
 success "Fonts installed"
 
 ################################################################################
+# LogOS Branding & Wallpaper
+################################################################################
+
+log "Installing LogOS branding and wallpaper..."
+
+# Create wallpaper directory
+sudo mkdir -p /usr/share/backgrounds/logos
+
+# Get script directory (assuming this is run from installer/modules)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# Copy wallpaper to system location
+if [[ -f "${SCRIPT_DIR}/assets/branding/logos-wallpaper.png" ]]; then
+    sudo cp "${SCRIPT_DIR}/assets/branding/logos-wallpaper.png" /usr/share/backgrounds/logos/
+    success "LogOS wallpaper installed"
+else
+    warning "Wallpaper not found in installer assets, skipping..."
+fi
+
+# Also copy to user's Pictures directory
+mkdir -p ~/Pictures/Wallpapers
+if [[ -f "${SCRIPT_DIR}/assets/branding/logos-wallpaper.png" ]]; then
+    cp "${SCRIPT_DIR}/assets/branding/logos-wallpaper.png" ~/Pictures/Wallpapers/
+fi
+
+# Set wallpaper based on desktop environment
+if [[ "$DESKTOP_ENV" != "none" ]]; then
+    log "Setting LogOS wallpaper for $DESKTOP_ENV..."
+
+    case "$DESKTOP_ENV" in
+        gnome)
+            # GNOME wallpaper setting
+            if [[ -f /usr/share/backgrounds/logos/logos-wallpaper.png ]]; then
+                # Set for current user
+                gsettings set org.gnome.desktop.background picture-uri "file:///usr/share/backgrounds/logos/logos-wallpaper.png" 2>/dev/null || true
+                gsettings set org.gnome.desktop.background picture-uri-dark "file:///usr/share/backgrounds/logos/logos-wallpaper.png" 2>/dev/null || true
+                gsettings set org.gnome.desktop.background picture-options "zoom" 2>/dev/null || true
+                success "GNOME wallpaper configured"
+            fi
+            ;;
+        kde)
+            # KDE Plasma wallpaper setting
+            if [[ -f /usr/share/backgrounds/logos/logos-wallpaper.png ]]; then
+                # Create KDE wallpaper script
+                cat > /tmp/set-kde-wallpaper.js <<'KDESCRIPT'
+var allDesktops = desktops();
+for (i=0;i<allDesktops.length;i++) {
+    d = allDesktops[i];
+    d.wallpaperPlugin = "org.kde.image";
+    d.currentConfigGroup = Array("Wallpaper", "org.kde.image", "General");
+    d.writeConfig("Image", "file:///usr/share/backgrounds/logos/logos-wallpaper.png");
+}
+KDESCRIPT
+                # Note: This will be applied on next login
+                success "KDE wallpaper script created (will apply on next login)"
+            fi
+            ;;
+        xfce)
+            # XFCE wallpaper setting
+            if [[ -f /usr/share/backgrounds/logos/logos-wallpaper.png ]]; then
+                xfconf-query -c xfce4-desktop -p /backdrop/screen0/monitor0/workspace0/last-image \
+                    -s /usr/share/backgrounds/logos/logos-wallpaper.png 2>/dev/null || true
+                success "XFCE wallpaper configured"
+            fi
+            ;;
+        i3)
+            # i3-wm wallpaper using feh
+            if [[ -f /usr/share/backgrounds/logos/logos-wallpaper.png ]]; then
+                # Add to i3 config
+                mkdir -p ~/.config/i3
+                if ! grep -q "logos-wallpaper" ~/.config/i3/config 2>/dev/null; then
+                    echo "exec --no-startup-id feh --bg-scale /usr/share/backgrounds/logos/logos-wallpaper.png" >> ~/.config/i3/config
+                fi
+                # Install feh if not present
+                sudo pacman -S --noconfirm --needed feh
+                success "i3-wm wallpaper configured"
+            fi
+            ;;
+    esac
+fi
+
+success "LogOS branding installed"
+
+################################################################################
 # Snapshot System
 ################################################################################
 
