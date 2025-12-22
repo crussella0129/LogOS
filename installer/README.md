@@ -51,6 +51,7 @@ iwctl
 # In iwctl prompt:
 # station wlan0 connect "YourNetworkName"
 # exit
+# Test connection with the instructions for "BARE METAL - ETHERNET OR VM" (Above)
 
 # Download installer from GitHub
 pacman -Sy git
