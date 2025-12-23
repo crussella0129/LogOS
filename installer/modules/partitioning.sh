@@ -47,7 +47,20 @@ create_partitions() {
     # Get partition names
     get_partition_names "$DISK"
 
-    success "Partitions created: $EFI_PART, $BOOT_PART, $ROOT_PART"
+    # Verify partitions were actually created
+    log "Verifying partition creation..."
+
+    for part in "$EFI_PART" "$BOOT_PART" "$ROOT_PART"; do
+        if [[ ! -b "$part" ]]; then
+            error "Partition not created: $part"
+            log "Available block devices:"
+            lsblk -o NAME,TYPE,SIZE,FSTYPE
+            return 1
+        fi
+    done
+
+    success "All partitions created successfully"
+    success "Partition names: $EFI_PART, $BOOT_PART, $ROOT_PART"
 }
 
 setup_encryption() {
@@ -81,6 +94,12 @@ setup_encryption() {
 
 mount_filesystems() {
     log "Creating filesystems..."
+
+    # Ensure vfat kernel module is loaded
+    log "Loading vfat kernel module..."
+    if ! modprobe vfat 2>&1 | tee -a "$INSTALL_LOG"; then
+        warning "vfat module already loaded or built-in"
+    fi
 
     # Format EFI partition
     log "Formatting EFI partition (FAT32)..."
@@ -133,7 +152,24 @@ mount_filesystems() {
     partprobe "$DISK"
 
     # Wait for kernel to fully recognize filesystems
-    sleep 2
+    sleep 3
+
+    # Additional wait for udev device node creation
+    log "Waiting for device nodes to be created..."
+    for i in {1..10}; do
+        if [[ -b "$EFI_PART" ]] && [[ -b "$BOOT_PART" ]]; then
+            success "Device nodes ready"
+            break
+        fi
+        sleep 0.5
+    done
+
+    # Final verification
+    if [[ ! -b "$EFI_PART" ]]; then
+        error "EFI partition device node still doesn't exist: $EFI_PART"
+        lsblk -o NAME,TYPE,SIZE,FSTYPE
+        return 1
+    fi
 
     success "Filesystem changes synchronized"
 
@@ -181,18 +217,96 @@ mount_filesystems() {
     done
     success "Mount point directories created and verified"
 
+    # Unmount any pre-existing mounts from failed attempts
+    log "Checking for pre-existing mounts..."
+
+    if mountpoint -q /mnt/boot/efi 2>/dev/null; then
+        warning "EFI mount point already mounted, unmounting..."
+        if ! umount /mnt/boot/efi 2>&1 | tee -a "$INSTALL_LOG"; then
+            error "Failed to unmount existing EFI mount"
+            return 1
+        fi
+    fi
+
+    if mountpoint -q /mnt/boot 2>/dev/null; then
+        warning "Boot mount point already mounted, unmounting..."
+        if ! umount /mnt/boot 2>&1 | tee -a "$INSTALL_LOG"; then
+            error "Failed to unmount existing boot mount"
+            return 1
+        fi
+    fi
+
+    success "Mount points clear"
+
+    # Pre-mount diagnostics and verification
+    log "Pre-mount verification for boot partition..."
+
+    # Check device exists
+    if [[ ! -b "$BOOT_PART" ]]; then
+        error "Boot partition device does not exist: $BOOT_PART"
+        log "Available block devices:"
+        lsblk -o NAME,TYPE,SIZE,FSTYPE | tee -a "$INSTALL_LOG"
+        return 1
+    fi
+
+    # Check filesystem with blkid
+    boot_fstype=$(blkid -s TYPE -o value "$BOOT_PART" 2>/dev/null)
+    if [[ "$boot_fstype" != "ext4" ]]; then
+        error "Boot partition has wrong filesystem: expected ext4, got $boot_fstype"
+        return 1
+    fi
+
+    success "Boot partition ready for mounting"
+
+    # Same for EFI partition
+    log "Pre-mount verification for EFI partition..."
+
+    if [[ ! -b "$EFI_PART" ]]; then
+        error "EFI partition device does not exist: $EFI_PART"
+        log "Available block devices:"
+        lsblk -o NAME,TYPE,SIZE,FSTYPE | tee -a "$INSTALL_LOG"
+        return 1
+    fi
+
+    efi_fstype=$(blkid -s TYPE -o value "$EFI_PART" 2>/dev/null)
+    if [[ "$efi_fstype" != "vfat" ]]; then
+        error "EFI partition has wrong filesystem: expected vfat, got $efi_fstype"
+        return 1
+    fi
+
+    success "EFI partition ready for mounting"
+
     # Mount boot partition
     log "Mounting boot partition to /mnt/boot..."
-    if ! mount -t ext4 "$BOOT_PART" /mnt/boot; then
+    if ! mount -t ext4 -v "$BOOT_PART" /mnt/boot 2>&1 | tee -a "$INSTALL_LOG"; then
         error "Failed to mount boot partition $BOOT_PART"
+        log "Mount debugging information:"
+        log "  Device: $BOOT_PART"
+        log "  Mount point: /mnt/boot"
+        log "  Expected filesystem: ext4"
+        log "  Actual filesystem: $(blkid -s TYPE -o value $BOOT_PART)"
+        log "  Device status: $(lsblk -o NAME,TYPE,SIZE,FSTYPE $BOOT_PART)"
+        log "  Current mounts:"
+        mount | grep -E "(boot|efi)" | tee -a "$INSTALL_LOG"
         return 1
     fi
     success "Boot partition mounted"
 
     # Mount EFI partition
     log "Mounting EFI partition to /mnt/boot/efi..."
-    if ! mount -t vfat "$EFI_PART" /mnt/boot/efi; then
+    if ! mount -t vfat -v "$EFI_PART" /mnt/boot/efi 2>&1 | tee -a "$INSTALL_LOG"; then
         error "Failed to mount EFI partition $EFI_PART"
+        log "Mount debugging information:"
+        log "  Device: $EFI_PART"
+        log "  Mount point: /mnt/boot/efi"
+        log "  Expected filesystem: vfat"
+        log "  Actual filesystem: $(blkid -s TYPE -o value $EFI_PART)"
+        log "  Device status: $(lsblk -o NAME,TYPE,SIZE,FSTYPE $EFI_PART)"
+        log "  Mount point exists: $(test -d /mnt/boot/efi && echo yes || echo no)"
+        log "  Current mounts:"
+        mount | grep -E "(boot|efi)" | tee -a "$INSTALL_LOG"
+        log "  Kernel modules:"
+        lsmod | grep -E "(vfat|fat)" | tee -a "$INSTALL_LOG"
         return 1
     fi
     success "EFI partition mounted"
