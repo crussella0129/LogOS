@@ -22,6 +22,18 @@ install_tier0() {
         nano vim
     )
 
+    # Create essential configuration files BEFORE pacstrap
+    # (mkinitcpio needs these during kernel package installation)
+    log "Creating pre-installation configuration files..."
+
+    # Create vconsole.conf for mkinitcpio
+    echo "KEYMAP=${KEYMAP:-us}" > /mnt/etc/vconsole.conf
+
+    # Create locale.conf for mkinitcpio
+    echo "LANG=${LOCALE:-en_US.UTF-8}" > /mnt/etc/locale.conf
+
+    success "Pre-installation configuration created"
+
     # Install packages
     log "Running pacstrap with Tier 0 packages..."
     echo "This may take several minutes depending on your internet connection..."
