@@ -204,12 +204,12 @@ mount_filesystems() {
     fi
     success "Root filesystem mounted and verified"
 
-    # Create mount points
-    mkdir -p /mnt/{boot,boot/efi,home,.snapshots,var/log,var/cache}
+    # Create mount points (note: boot/efi is created AFTER mounting boot partition)
+    mkdir -p /mnt/{boot,home,.snapshots,var/log,var/cache}
 
     # Verify mount point directories were created
     log "Verifying mount point directories..."
-    for dir in boot boot/efi home .snapshots var/log var/cache; do
+    for dir in boot home .snapshots var/log var/cache; do
         if [[ ! -d "/mnt/$dir" ]]; then
             error "Failed to create directory: /mnt/$dir"
             return 1
@@ -291,6 +291,15 @@ mount_filesystems() {
         return 1
     fi
     success "Boot partition mounted"
+
+    # Create EFI mount point on the now-mounted boot partition
+    log "Creating EFI mount point on boot partition..."
+    mkdir -p /mnt/boot/efi
+    if [[ ! -d "/mnt/boot/efi" ]]; then
+        error "Failed to create /mnt/boot/efi directory"
+        return 1
+    fi
+    success "EFI mount point created"
 
     # Mount EFI partition
     log "Mounting EFI partition to /mnt/boot/efi..."
