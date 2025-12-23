@@ -256,12 +256,68 @@ EOF
 configure_mkinitcpio() {
     log "Configuring mkinitcpio for encryption..."
 
+    # Define the required hooks for LUKS encryption with Btrfs
+    local required_hooks="HOOKS=(base udev autodetect microcode modconf kms keyboard keymap consolefont block encrypt btrfs filesystems fsck)"
+
+    # Backup original mkinitcpio.conf
+    cp /mnt/etc/mkinitcpio.conf /mnt/etc/mkinitcpio.conf.bak
+
     # Update HOOKS for encryption support
-    sed -i 's/^HOOKS=.*/HOOKS=(base udev autodetect microcode modconf kms keyboard keymap consolefont block encrypt btrfs filesystems fsck)/' \
-        /mnt/etc/mkinitcpio.conf
+    # Use a more robust pattern that handles any HOOKS line format
+    if grep -q "^HOOKS=" /mnt/etc/mkinitcpio.conf; then
+        sed -i "s/^HOOKS=.*/$required_hooks/" /mnt/etc/mkinitcpio.conf
+        log "Updated existing HOOKS line"
+    elif grep -q "^#.*HOOKS=" /mnt/etc/mkinitcpio.conf; then
+        # If HOOKS is commented out, add our own line
+        echo "$required_hooks" >> /mnt/etc/mkinitcpio.conf
+        log "Added new HOOKS line (original was commented)"
+    else
+        # No HOOKS line found at all, add one
+        echo "$required_hooks" >> /mnt/etc/mkinitcpio.conf
+        log "Added new HOOKS line"
+    fi
+
+    # Verify the HOOKS line contains 'encrypt' hook
+    if ! grep -q "^HOOKS=.*encrypt.*" /mnt/etc/mkinitcpio.conf; then
+        error "CRITICAL: Failed to configure encrypt hook in mkinitcpio.conf"
+        log "Current mkinitcpio.conf HOOKS line:"
+        grep "HOOKS=" /mnt/etc/mkinitcpio.conf | tee -a "$INSTALL_LOG"
+        return 1
+    fi
+
+    # Also verify btrfs hook is present
+    if ! grep -q "^HOOKS=.*btrfs.*" /mnt/etc/mkinitcpio.conf; then
+        error "CRITICAL: Failed to configure btrfs hook in mkinitcpio.conf"
+        return 1
+    fi
+
+    success "mkinitcpio.conf updated with encrypt and btrfs hooks"
+
+    # Display the configured HOOKS line for verification
+    log "Configured HOOKS:"
+    grep "^HOOKS=" /mnt/etc/mkinitcpio.conf | tee -a "$INSTALL_LOG"
 
     # Regenerate initramfs for all kernels
-    arch_chroot "mkinitcpio -P"
+    log "Regenerating initramfs for all installed kernels..."
+    if ! arch_chroot "mkinitcpio -P" 2>&1 | tee -a "$INSTALL_LOG"; then
+        error "Failed to regenerate initramfs"
+        return 1
+    fi
 
-    success "mkinitcpio configured and initramfs generated"
+    # Verify initramfs files were created/updated
+    log "Verifying initramfs files..."
+    local initramfs_found=0
+    for kernel in linux linux-lts linux-zen; do
+        if [[ -f "/mnt/boot/initramfs-${kernel}.img" ]]; then
+            success "Initramfs found: initramfs-${kernel}.img"
+            initramfs_found=$((initramfs_found + 1))
+        fi
+    done
+
+    if [[ $initramfs_found -eq 0 ]]; then
+        error "CRITICAL: No initramfs files found after mkinitcpio"
+        return 1
+    fi
+
+    success "mkinitcpio configured and $initramfs_found initramfs image(s) generated"
 }
