@@ -23,14 +23,21 @@ install_tier0() {
     )
 
     # Create essential configuration files BEFORE pacstrap
-    # (mkinitcpio needs these during kernel package installation)
+    # (some hooks may read these during install / image generation)
     log "Creating pre-installation configuration files..."
 
-    # Create vconsole.conf for mkinitcpio
-    echo "KEYMAP=${KEYMAP:-us}" > /mnt/etc/vconsole.conf
+    # Ensure target root skeleton exists (pacstrap normally creates these)
+    mkdir -p /mnt/etc
 
-    # Create locale.conf for mkinitcpio
-    echo "LANG=${LOCALE:-en_US.UTF-8}" > /mnt/etc/locale.conf
+    # Create vconsole.conf
+    cat > /mnt/etc/vconsole.conf <<EOF
+KEYMAP=${KEYMAP:-us}
+EOF
+
+    # Create locale.conf
+    cat > /mnt/etc/locale.conf <<EOF
+LANG=${LOCALE:-en_US.UTF-8}
+EOF
 
     success "Pre-installation configuration created"
 
@@ -43,6 +50,17 @@ install_tier0() {
     else
         error "Tier 0 installation failed"
         return 1
+    fi
+
+    # (Optional but recommended) Ensure the files still exist after pacstrap
+    # in case anything overwrote /mnt/etc during base install.
+    if [[ ! -f /mnt/etc/vconsole.conf ]]; then
+        warning "vconsole.conf missing after pacstrap; recreating"
+        echo "KEYMAP=${KEYMAP:-us}" > /mnt/etc/vconsole.conf
+    fi
+    if [[ ! -f /mnt/etc/locale.conf ]]; then
+        warning "locale.conf missing after pacstrap; recreating"
+        echo "LANG=${LOCALE:-en_US.UTF-8}" > /mnt/etc/locale.conf
     fi
 
     # Verify kernels installed
@@ -78,7 +96,7 @@ verify_tier0() {
 
     for bin in "${essential_bins[@]}"; do
         if [[ -f "$bin" ]]; then
-            success "Essential binary found: $(basename $bin)"
+            success "Essential binary found: $(basename "$bin")"
         else
             error "Essential binary not found: $bin"
             return 1
