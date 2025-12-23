@@ -365,12 +365,12 @@ generate_fstab() {
     # Get Btrfs UUID
     local btrfs_uuid=$(get_btrfs_uuid)
 
-    # Add Cold Canon subvolume (with copies=2 for bitrot protection)
+    # Add Cold Canon subvolume (high compression for archival data)
     mkdir -p /mnt/home/"$USERNAME"/Documents
     cat >> /mnt/etc/fstab <<EOF
 
-# Cold Canon (copies=2 for bitrot protection)
-UUID=$btrfs_uuid  /home/$USERNAME/Documents  btrfs  subvol=@canon,noatime,compress=zstd:9,space_cache=v2,discard=async,copies=2  0  0
+# Cold Canon (high compression for archival data)
+UUID=$btrfs_uuid  /home/$USERNAME/Documents  btrfs  subvol=@canon,noatime,compress=zstd:9,space_cache=v2,discard=async  0  0
 
 # Warm Mesh (sync directory)
 EOF
