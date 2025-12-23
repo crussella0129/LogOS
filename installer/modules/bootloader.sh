@@ -136,12 +136,11 @@ terminal-box: "terminal_box_*.png"
   top = 30%
   width = 70%
   height = 50%
-  item_color = "#f0f0f0"
-  selected_item_color = "#ffffff"
+  item_color = "#a0a0a0"
+  selected_item_color = "#00bfff"
   item_height = 32
   item_padding = 8
   item_spacing = 4
-  selected_item_pixmap_style = "select_*.png"
 }
 
 + label {
