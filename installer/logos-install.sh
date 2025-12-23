@@ -39,7 +39,7 @@ START_TIME=$(date +%s)
 CONFIG_FILE="/tmp/logos-install.conf"
 
 # Total installation steps
-TOTAL_STEPS=8
+TOTAL_STEPS=9
 
 ################################################################################
 # Banner
@@ -176,20 +176,26 @@ main() {
     configure_system_chroot
     complete_step
 
-    # Step 5: Bootloader & Ringed City profiles
+    # Step 5: Desktop Environment Installation
     next_step
-    log_step "6" "Bootloader Installation"
+    log_step "6" "Desktop Environment Installation"
+    source "${SCRIPT_DIR}/modules/60-desktop.sh"
+    install_desktop
+    complete_step
+
+    # Step 6: Bootloader & Ringed City profiles
+    next_step
+    log_step "7" "Bootloader Installation"
     source "${SCRIPT_DIR}/modules/bootloader.sh"
     install_bootloader
     create_ringed_city_profiles
     complete_step
 
-    # Step 6: Finalization
+    # Step 7: Finalization
     next_step
-    log_step "7" "Finalization"
+    log_step "8" "Finalization"
     finalize_installation
     complete_step
-
     # Installation complete
     installation_complete
 }
