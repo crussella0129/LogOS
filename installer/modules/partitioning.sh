@@ -84,17 +84,58 @@ mount_filesystems() {
 
     # Format EFI partition
     log "Formatting EFI partition (FAT32)..."
-    mkfs.fat -F32 -n EFI "$EFI_PART" &>/dev/null
+    if ! mkfs.fat -F32 -n EFI "$EFI_PART" 2>&1 | tee -a "$INSTALL_LOG" | grep -q "mkfs.fat"; then
+        error "Failed to format EFI partition $EFI_PART"
+        return 1
+    fi
 
     # Format boot partition
     log "Formatting boot partition (ext4)..."
-    mkfs.ext4 -L BOOT "$BOOT_PART" &>/dev/null
+    if ! mkfs.ext4 -L BOOT "$BOOT_PART" &>/dev/null; then
+        error "Failed to format boot partition $BOOT_PART"
+        return 1
+    fi
 
     # Create Btrfs on encrypted root
     log "Creating Btrfs filesystem on encrypted partition..."
-    mkfs.btrfs -f -L LogOS /dev/mapper/cryptroot &>/dev/null
+    if ! mkfs.btrfs -f -L LogOS /dev/mapper/cryptroot &>/dev/null; then
+        error "Failed to create Btrfs filesystem"
+        return 1
+    fi
 
     success "Filesystems created"
+
+    # Verify filesystems were created successfully
+    log "Verifying filesystem creation..."
+
+    if ! blkid "$EFI_PART" | grep -q "vfat"; then
+        error "EFI filesystem not created properly"
+        return 1
+    fi
+
+    if ! blkid "$BOOT_PART" | grep -q "ext4"; then
+        error "Boot filesystem not created properly"
+        return 1
+    fi
+
+    if ! blkid /dev/mapper/cryptroot | grep -q "btrfs"; then
+        error "Root filesystem not created properly"
+        return 1
+    fi
+
+    success "All filesystems verified"
+
+    # Ensure all filesystem changes are written to disk
+    log "Synchronizing filesystem changes to disk..."
+    sync
+
+    # Refresh kernel partition table to recognize new filesystems
+    partprobe "$DISK"
+
+    # Wait for kernel to fully recognize filesystems
+    sleep 2
+
+    success "Filesystem changes synchronized"
 
     # Mount root and create subvolumes
     log "Creating Btrfs subvolumes..."
@@ -142,7 +183,7 @@ mount_filesystems() {
 
     # Mount boot partition
     log "Mounting boot partition to /mnt/boot..."
-    if ! mount "$BOOT_PART" /mnt/boot; then
+    if ! mount -t ext4 "$BOOT_PART" /mnt/boot; then
         error "Failed to mount boot partition $BOOT_PART"
         return 1
     fi
@@ -150,7 +191,7 @@ mount_filesystems() {
 
     # Mount EFI partition
     log "Mounting EFI partition to /mnt/boot/efi..."
-    if ! mount "$EFI_PART" /mnt/boot/efi; then
+    if ! mount -t vfat "$EFI_PART" /mnt/boot/efi; then
         error "Failed to mount EFI partition $EFI_PART"
         return 1
     fi
