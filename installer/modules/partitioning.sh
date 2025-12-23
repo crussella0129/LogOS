@@ -120,14 +120,41 @@ mount_filesystems() {
     mount -o noatime,compress=zstd:3,space_cache=v2,discard=async,subvol=@ \
         /dev/mapper/cryptroot /mnt
 
+    # Verify root is mounted before creating subdirectories
+    if ! mountpoint -q /mnt; then
+        error "Root filesystem not mounted at /mnt"
+        return 1
+    fi
+    success "Root filesystem mounted and verified"
+
     # Create mount points
     mkdir -p /mnt/{boot,boot/efi,home,.snapshots,var/log,var/cache}
 
-    # Mount boot
-    mount "$BOOT_PART" /mnt/boot
+    # Verify mount point directories were created
+    log "Verifying mount point directories..."
+    for dir in boot boot/efi home .snapshots var/log var/cache; do
+        if [[ ! -d "/mnt/$dir" ]]; then
+            error "Failed to create directory: /mnt/$dir"
+            return 1
+        fi
+    done
+    success "Mount point directories created and verified"
 
-    # Mount EFI
-    mount "$EFI_PART" /mnt/boot/efi
+    # Mount boot partition
+    log "Mounting boot partition to /mnt/boot..."
+    if ! mount "$BOOT_PART" /mnt/boot; then
+        error "Failed to mount boot partition $BOOT_PART"
+        return 1
+    fi
+    success "Boot partition mounted"
+
+    # Mount EFI partition
+    log "Mounting EFI partition to /mnt/boot/efi..."
+    if ! mount "$EFI_PART" /mnt/boot/efi; then
+        error "Failed to mount EFI partition $EFI_PART"
+        return 1
+    fi
+    success "EFI partition mounted"
 
     # Mount other subvolumes
     mount -o noatime,compress=zstd:3,space_cache=v2,discard=async,subvol=@home \
@@ -144,14 +171,25 @@ mount_filesystems() {
 
     success "Filesystems mounted"
 
-    # Verify mounts
-    log "Verifying mount points..."
-    if ! is_mounted /mnt; then
-        error "Root filesystem not mounted"
-        exit 1
+    # Verify all critical mounts
+    log "Verifying all mount points..."
+    local mount_errors=0
+
+    for mount_point in /mnt /mnt/boot /mnt/boot/efi /mnt/home /mnt/.snapshots; do
+        if ! mountpoint -q "$mount_point"; then
+            error "Mount point verification failed: $mount_point"
+            ((mount_errors++))
+        else
+            success "Verified: $mount_point"
+        fi
+    done
+
+    if [[ $mount_errors -gt 0 ]]; then
+        error "Mount verification failed with $mount_errors error(s)"
+        return 1
     fi
 
-    success "All filesystems mounted successfully"
+    success "All filesystems mounted and verified successfully"
 }
 
 generate_fstab() {
