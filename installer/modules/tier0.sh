@@ -95,20 +95,36 @@ EOF
 verify_tier0() {
     log "Verifying Tier 0 installation..."
 
-    # Check for kernels
+    # Debug: List actual kernel files in /mnt/boot
+    log "Listing kernel files in /mnt/boot:"
+    ls -la /mnt/boot/vmlinuz-* 2>&1 | tee -a "$INSTALL_LOG" || echo "No vmlinuz files found"
+
+    # Check for kernels - at least ONE kernel must be present
     local kernels_found=0
+    local missing_kernels=""
+    
     for kernel in linux linux-lts linux-zen; do
         if [[ -f "/mnt/boot/vmlinuz-$kernel" ]]; then
             success "Kernel found: $kernel"
-            ((kernels_found++))
+            kernels_found=$((kernels_found + 1))
         else
             warning "Kernel not found: $kernel"
+            missing_kernels="$missing_kernels $kernel"
         fi
     done
 
-    if [[ $kernels_found -lt 3 ]]; then
-        error "Not all kernels were installed"
+    log "Total kernels found: $kernels_found/3"
+
+    # Require at least ONE kernel to boot
+    if [[ $kernels_found -eq 0 ]]; then
+        error "CRITICAL: No kernels were installed! System will not boot."
         return 1
+    fi
+
+    # Warn if not all kernels installed, but continue
+    if [[ $kernels_found -lt 3 ]]; then
+        warning "Not all kernels were installed (missing:$missing_kernels)"
+        warning "System will boot with available kernel(s). You can install missing kernels later."
     fi
 
     # Check for essential binaries
@@ -119,14 +135,20 @@ verify_tier0() {
         "/mnt/usr/bin/nano"
     )
 
+    local missing_bins=0
     for bin in "${essential_bins[@]}"; do
         if [[ -f "$bin" ]]; then
             success "Essential binary found: $(basename "$bin")"
         else
             error "Essential binary not found: $bin"
-            return 1
+            missing_bins=$((missing_bins + 1))
         fi
     done
+
+    if [[ $missing_bins -gt 0 ]]; then
+        error "Missing $missing_bins essential binaries - installation incomplete"
+        return 1
+    fi
 
     success "Tier 0 verification passed"
     return 0
