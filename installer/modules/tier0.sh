@@ -23,21 +23,46 @@ install_tier0() {
     )
 
     # Create essential configuration files BEFORE pacstrap
-    # (some hooks may read these during install / image generation)
+    # (mkinitcpio hooks read these during kernel package installation)
     log "Creating pre-installation configuration files..."
 
-    # Ensure target root skeleton exists (pacstrap normally creates these)
-    mkdir -p /mnt/etc
+    # Verify /mnt is mounted before proceeding
+    if ! mountpoint -q /mnt; then
+        error "Root filesystem not mounted at /mnt - cannot create pre-installation configs"
+        return 1
+    fi
 
-    # Create vconsole.conf
-    cat > /mnt/etc/vconsole.conf <<EOF
+    # Ensure target root skeleton exists (pacstrap normally creates /mnt/etc)
+    if ! mkdir -p /mnt/etc; then
+        error "Failed to create /mnt/etc directory"
+        log "Mount status:"
+        mount | grep /mnt | tee -a "$INSTALL_LOG"
+        return 1
+    fi
+
+    # Verify directory was created
+    if [[ ! -d /mnt/etc ]]; then
+        error "/mnt/etc directory does not exist after mkdir"
+        return 1
+    fi
+
+    # Create vconsole.conf (required by mkinitcpio sd-vconsole hook)
+    if ! cat > /mnt/etc/vconsole.conf <<EOF
 KEYMAP=${KEYMAP:-us}
 EOF
+    then
+        error "Failed to create /mnt/etc/vconsole.conf"
+        return 1
+    fi
 
     # Create locale.conf
-    cat > /mnt/etc/locale.conf <<EOF
+    if ! cat > /mnt/etc/locale.conf <<EOF
 LANG=${LOCALE:-en_US.UTF-8}
 EOF
+    then
+        error "Failed to create /mnt/etc/locale.conf"
+        return 1
+    fi
 
     success "Pre-installation configuration created"
 

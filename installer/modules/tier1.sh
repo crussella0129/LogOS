@@ -7,6 +7,12 @@
 install_tier1() {
     log "Installing Tier 1: Security Infrastructure..."
 
+    # Verify /mnt is mounted before proceeding
+    if ! mountpoint -q /mnt; then
+        error "Root filesystem not mounted at /mnt - cannot install Tier 1 packages"
+        return 1
+    fi
+
     # Tier 1 packages - Security infrastructure
     local tier1_packages=(
         apparmor
