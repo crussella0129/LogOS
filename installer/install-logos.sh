@@ -346,16 +346,22 @@ print_success() {
 ╚══════════════════════════════════════════════════════════════════════════════╝
 
 Next Steps:
-1. Remove installation media
+1. IMPORTANT: Remove the installation media (USB/ISO) from your system
 2. Reboot: systemctl reboot
-3. Select boot profile at GRUB menu:
+3. Your system should automatically boot into LogOS (GRUB bootloader)
+4. Select your desired boot profile at the GRUB menu:
    - Gael (Maximum Security)
    - Midir (Balanced) - Recommended for daily use
    - Halflight (Performance)
 
-4. After first boot, run post-installation setup:
+5. After first boot, run post-installation setup:
    - Install Tier 2 (Desktop): ./installer/modules/tier2-standalone.sh
    - Install Tier 3 (Specialized): ./installer/modules/tier3-standalone.sh
+
+If the system boots back to the installation media instead of LogOS:
+- Check your BIOS/UEFI boot order settings
+- Ensure "LogOS" is set as the first boot option
+- Disable boot from USB/CD in BIOS if needed
 
 Documentation: See LogOS_Build_Guide_2025_MASTER_v7.md
 

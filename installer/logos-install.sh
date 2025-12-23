@@ -378,26 +378,32 @@ installation_complete() {
 
 Next Steps:
 
-1. Remove the installation media
+1. IMPORTANT: Remove the installation media (USB/ISO) from your system
 2. Reboot the system:
 
    # reboot
 
-3. At the GRUB menu, select your Ringed City profile:
+3. Your system should automatically boot into LogOS (GRUB bootloader)
+4. At the GRUB menu, select your Ringed City profile:
    • Midir (Balanced) - Recommended for daily use
    • Gael (Maximum Security) - For sensitive operations
    • Halflight (Performance) - For gaming/media production
 
-4. Login with your username and password
+5. Login with your username and password
 
-5. After first boot, install desktop environment (if selected):
+6. After first boot, install desktop environment (if selected):
 
    $ cd LogOS/installer/modules
    $ ./tier2-standalone.sh
 
-6. Optionally install specialized tools:
+7. Optionally install specialized tools:
 
    $ ./tier3-standalone.sh
+
+If the system boots back to the installation media instead of LogOS:
+- Check your BIOS/UEFI boot order settings
+- Ensure "LogOS" is set as the first boot option
+- Disable boot from USB/CD in BIOS if needed
 
 Documentation:
 - Full guide: /usr/share/doc/logos/LogOS_Build_Guide_2025_MASTER_v7.md

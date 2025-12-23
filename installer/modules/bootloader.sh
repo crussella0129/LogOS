@@ -4,6 +4,58 @@
 # LogOS Installer - Bootloader Configuration Module
 ################################################################################
 
+setup_efi_boot_entry() {
+    log "Configuring EFI boot entry..."
+
+    # Get the disk device (not partition) for efibootmgr
+    local efi_disk
+    if [[ "$DISK" =~ nvme ]]; then
+        efi_disk="$DISK"
+        local efi_part_num="1"
+    else
+        efi_disk="$DISK"
+        local efi_part_num="1"
+    fi
+
+    # Check if LogOS boot entry exists
+    log "Checking for existing LogOS boot entry..."
+    local boot_entries
+    boot_entries=$(arch_chroot "efibootmgr")
+
+    if echo "$boot_entries" | grep -q "LogOS"; then
+        success "LogOS boot entry found"
+        # Get the boot number
+        local boot_num=$(echo "$boot_entries" | grep "LogOS" | sed 's/Boot\([0-9A-F]\{4\}\).*/\1/')
+        log "LogOS boot entry: Boot$boot_num"
+    else
+        warning "LogOS boot entry not found, creating manually..."
+        # Create boot entry manually
+        arch_chroot "efibootmgr --create --disk $efi_disk --part $efi_part_num --label 'LogOS' --loader '\EFI\LogOS\grubx64.efi'"
+        success "LogOS boot entry created"
+        boot_entries=$(arch_chroot "efibootmgr")
+        boot_num=$(echo "$boot_entries" | grep "LogOS" | sed 's/Boot\([0-9A-F]\{4\}\).*/\1/')
+    fi
+
+    # Set LogOS as first boot option
+    log "Setting LogOS as first boot option..."
+    local current_order=$(echo "$boot_entries" | grep "BootOrder:" | sed 's/BootOrder: //')
+
+    # Remove LogOS from current order if it exists and prepend it
+    local new_order="$boot_num"
+    for entry in ${current_order//,/ }; do
+        if [[ "$entry" != "$boot_num" ]]; then
+            new_order="$new_order,$entry"
+        fi
+    done
+
+    arch_chroot "efibootmgr --bootorder $new_order"
+    success "Boot order updated: LogOS is now the first boot option"
+
+    # Display final boot configuration
+    log "Final EFI boot configuration:"
+    arch_chroot "efibootmgr" | tee -a "$INSTALL_LOG"
+}
+
 install_bootloader() {
     log "Installing GRUB bootloader..."
 
@@ -48,6 +100,9 @@ EOF
     arch_chroot "grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=LogOS --recheck"
 
     success "GRUB installed"
+
+    # Verify and fix EFI boot entry
+    setup_efi_boot_entry
 }
 
 install_grub_branding() {
