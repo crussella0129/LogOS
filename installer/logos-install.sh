@@ -1,83 +1,21 @@
 #!/bin/bash
 
-################################################################################
-# LogOS Installation Orchestrator
-# Main entry point for automated LogOS installation
-# Version: 2025.7 - Ringed City
-################################################################################
-
 set -euo pipefail
 
-################################################################################
-# Script Initialization
-################################################################################
-
-# Get script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export SCRIPT_DIR
 
-# Source core libraries
 source "${SCRIPT_DIR}/lib/common.sh"
 source "${SCRIPT_DIR}/lib/logging.sh"
 source "${SCRIPT_DIR}/lib/error-handling.sh"
 source "${SCRIPT_DIR}/lib/validation.sh"
 
-# Initialize logging
-init_logging
-
-# Register error handlers
-register_cleanup default_cleanup
-
-# Start time
+CONFIG_FILE="${CONFIG_FILE:-/tmp/logos-install.conf}"
+TOTAL_STEPS=9
 START_TIME=$(date +%s)
 
-################################################################################
-# Configuration
-################################################################################
-
-# Installation configuration file
-CONFIG_FILE="/tmp/logos-install.conf"
-
-# Total installation steps
-TOTAL_STEPS=9
-
-################################################################################
-# Banner
-################################################################################
-
-print_banner() {
-    clear
-    cat << 'EOF'
-╔══════════════════════════════════════════════════════════════════════════════╗
-║                                                                              ║
-║                          LogOS Installation System                           ║
-║                    Ontology Substrate Operating System                       ║
-║                                                                              ║
-║                              Version 2025.7                                  ║
-║                           Codename: Ringed City                              ║
-║                                                                              ║
-║   "In the beginning was the Logos, and the Logos was with God..."           ║
-║                                                                              ║
-╚══════════════════════════════════════════════════════════════════════════════╝
-
-EOF
-
-    echo -e "${YELLOW}⚠ WARNING: This will ERASE ALL DATA on the selected disk! ⚠${NC}"
-    echo ""
-    echo "This installer will guide you through installing LogOS, a hardened"
-    echo "Arch Linux-based system with:"
-    echo ""
-    echo "  - Triple-kernel architecture (Gael/Midir/Halflight profiles)"
-    echo "  - Full-disk encryption with LUKS2"
-    echo "  - Btrfs with snapshots and rollback capability"
-    echo "  - AppArmor, audit, UFW, fail2ban security"
-    echo "  - Knowledge preservation topology (Cold Canon/Warm Mesh)"
-    echo "  - Professional branding and boot experience"
-    echo ""
-    echo "Installation time: 15-30 minutes (depending on internet speed)"
-    echo ""
-    prompt_enter
-}
+init_logging
+register_cleanup default_cleanup
 
 require_tty() {
     if [[ ! -t 0 ]]; then
@@ -88,254 +26,96 @@ require_tty() {
 
 prompt_enter() {
     local _reply
-    if ! read -r -p "Press ENTER to begin installation, or Ctrl+C to exit... " _reply; then
+    if ! read -r -p "Press ENTER to continue, or Ctrl+C to abort... " _reply; then
         log_fatal "Input stream closed. Run from an interactive terminal."
         exit 1
     fi
 }
 
-################################################################################
-# Module Loading
-################################################################################
+prompt_value() {
+    local prompt=$1
+    local var=$2
+    local default=${3:-}
+    local value
 
-load_modules() {
-    log_info "Loading installation modules..."
-
-    # Load modules in order
-    local modules=(
-        "00-preflight.sh"
-        "partitioning.sh"
-        "tier0.sh"
-        "tier1.sh"
-        "chroot.sh"
-        "bootloader.sh"
-        "60-desktop.sh"
-    )
-
-    for module in "${modules[@]}"; do
-        local module_path="${SCRIPT_DIR}/modules/${module}"
-
-        if [[ -f "$module_path" ]]; then
-            log_debug "Loading module: $module"
-            source "$module_path"
-        else
-            log_warn "Module not found: $module (using fallback)"
-        fi
-    done
-
-    log_success "Modules loaded"
-}
-
-################################################################################
-# Main Installation Flow
-################################################################################
-
-main() {
-    require_tty
-    print_banner
-
-    log_info "LogOS Installation Started"
-    log_info "Installation log: $INSTALL_LOG"
-
-    # Initialize progress
-    start_progress $TOTAL_STEPS
-
-    # Step 0: Pre-flight checks
-    next_step
-    if command -v module_00_preflight &>/dev/null; then
-        module_00_preflight
-    else
-        log_warn "Pre-flight module not found, using compatibility mode"
-        # Fall back to inline checks
-        source "${SCRIPT_DIR}/lib/validation.sh"
-        validate_install_environment || exit 1
-    fi
-    complete_step
-
-    # Gather user configuration
-    log_step "1" "Configuration"
-    gather_user_configuration
-    confirm_installation
-    next_step
-    complete_step
-
-    # Step 1: Disk setup
-    next_step
-    log_step "2" "Disk Preparation"
-    source "${SCRIPT_DIR}/modules/partitioning.sh"
-    prepare_disk
-    create_partitions
-    setup_encryption
-    mount_filesystems
-    complete_step
-
-    # Step 2: Base system installation (Tier 0)
-    next_step
-    log_step "3" "Base System Installation (Tier 0)"
-    source "${SCRIPT_DIR}/modules/tier0.sh"
-    install_tier0
-    complete_step
-
-    # Step 3: Security infrastructure (Tier 1)
-    next_step
-    log_step "4" "Security Infrastructure (Tier 1)"
-    source "${SCRIPT_DIR}/modules/tier1.sh"
-    install_tier1
-    complete_step
-
-    # Step 4: System configuration
-    next_step
-    log_step "5" "System Configuration"
-    generate_fstab
-    source "${SCRIPT_DIR}/modules/chroot.sh"
-    configure_system_chroot
-    complete_step
-
-    # Step 5: Desktop Environment Installation
-    next_step
-    log_step "6" "Desktop Environment Installation"
-    source "${SCRIPT_DIR}/modules/60-desktop.sh"
-    install_desktop
-    complete_step
-
-    # Step 6: Bootloader & Ringed City profiles
-    next_step
-    log_step "7" "Bootloader Installation"
-    source "${SCRIPT_DIR}/modules/bootloader.sh"
-    install_bootloader
-    create_ringed_city_profiles
-    complete_step
-
-    # Step 7: Finalization
-    next_step
-    log_step "8" "Finalization"
-    finalize_installation
-    complete_step
-    # Installation complete
-    installation_complete
-}
-
-################################################################################
-# User Configuration
-################################################################################
-
-gather_user_configuration() {
-    log_info "Gathering installation configuration..."
-
-    # Check if config already exists (resume)
-    if [[ -f "$CONFIG_FILE" ]]; then
-        log_info "Found existing configuration file"
-        read -p "Resume with existing configuration? (y/N): " resume
-        if [[ "$resume" =~ ^[Yy]$ ]]; then
-            source "$CONFIG_FILE"
-            SECURE_BOOT="${SECURE_BOOT:-n}"
-            log_success "Configuration loaded"
-            return
-        fi
+    if ! read -r -p "$prompt" value; then
+        log_fatal "Input stream closed. Run from an interactive terminal."
+        exit 1
     fi
 
-    # Disk selection
+    if [[ -z "$value" ]]; then
+        value="$default"
+    fi
+
+    printf -v "$var" "%s" "$value"
+}
+
+prompt_secret() {
+    local prompt=$1
+    local var=$2
+    local value
+
+    if ! read -r -s -p "$prompt" value; then
+        echo ""
+        log_fatal "Input stream closed. Run from an interactive terminal."
+        exit 1
+    fi
+
     echo ""
-    echo "Available disks:"
-    lsblk -d -o NAME,SIZE,TYPE,MODEL | grep disk
+    printf -v "$var" "%s" "$value"
+}
+
+print_banner() {
+    clear
+    cat << 'EOF'
+============================================================
+                 LogOS Installation System
+                 Version 2025.7 - Ringed City
+============================================================
+EOF
     echo ""
-    while true; do
-        read -p "Enter target disk (e.g., sda, nvme0n1): " disk_input
-        DISK="/dev/${disk_input}"
-
-        if validate_disk "$DISK"; then
-            break
-        fi
-        log_error "Invalid disk selection. Please try again."
-    done
-
-    # Basic configuration
-    read -p "Hostname [logos]: " HOSTNAME
-    HOSTNAME="${HOSTNAME:-logos}"
-
-    read -p "Username [logos]: " USERNAME
-    USERNAME="${USERNAME:-logos}"
-
-    read -p "Timezone (e.g., America/New_York) [America/New_York]: " TIMEZONE
-    TIMEZONE="${TIMEZONE:-America/New_York}"
-
-    # LUKS passphrase
-    while true; do
-        read -s -p "LUKS encryption passphrase (20+ chars): " LUKS_PASS
-        echo ""
-        if [[ ${#LUKS_PASS} -lt 20 ]]; then
-            log_error "Passphrase too short (minimum 20 characters)"
-            continue
-        fi
-        read -s -p "Confirm passphrase: " LUKS_PASS_CONFIRM
-        echo ""
-        if [[ "$LUKS_PASS" == "$LUKS_PASS_CONFIRM" ]]; then
-            break
-        fi
-        log_error "Passphrases do not match"
-    done
-
-    # Root password
-    while true; do
-        read -s -p "Root password: " ROOT_PASS
-        echo ""
-        read -s -p "Confirm root password: " ROOT_PASS_CONFIRM
-        echo ""
-        [[ "$ROOT_PASS" == "$ROOT_PASS_CONFIRM" ]] && break
-        log_error "Passwords do not match"
-    done
-
-    # User password
-    while true; do
-        read -s -p "User password: " USER_PASS
-        echo ""
-        read -s -p "Confirm user password: " USER_PASS_CONFIRM
-        echo ""
-        [[ "$USER_PASS" == "$USER_PASS_CONFIRM" ]] && break
-        log_error "Passwords do not match"
-    done
-
-    # GPU type
+    echo "WARNING: This will ERASE ALL DATA on the selected disk!"
     echo ""
-    echo "GPU Type:"
-    echo "1) AMD (Recommended)"
-    echo "2) NVIDIA"
-    echo "3) Intel"
-    echo "4) None"
-    read -p "Selection [1]: " gpu_choice
-    case "${gpu_choice:-1}" in
-        1) GPU_TYPE="amd" ;;
-        2) GPU_TYPE="nvidia" ;;
-        3) GPU_TYPE="intel" ;;
-        *) GPU_TYPE="none" ;;
-    esac
+}
 
-    # Desktop environment
-    echo ""
-    echo "Desktop Environment:"
-    echo "1) GNOME"
-    echo "2) KDE Plasma"
-    echo "3) XFCE"
-    echo "4) i3-wm"
-    echo "5) None (server)"
-    read -p "Selection [1]: " de_choice
-    case "${de_choice:-1}" in
-        1) DESKTOP_ENV="gnome" ;;
-        2) DESKTOP_ENV="kde" ;;
-        3) DESKTOP_ENV="xfce" ;;
-        4) DESKTOP_ENV="i3" ;;
-        *) DESKTOP_ENV="none" ;;
-    esac
+source_module() {
+    local module_name=$1
+    local module_path="${SCRIPT_DIR}/modules/${module_name}"
 
-    # Secure Boot
-    echo ""
-    read -p "Configure Secure Boot with sbctl? (y/N): " SECURE_BOOT
-    SECURE_BOOT="${SECURE_BOOT:-n}"
+    if [[ ! -f "$module_path" ]]; then
+        log_fatal "Missing module: ${module_name}"
+        exit 1
+    fi
 
-    # Save configuration
-    save_configuration
+    source "$module_path"
+}
 
-    log_success "Configuration gathered"
+load_preflight() {
+    source_module "00-preflight.sh"
+}
+
+load_partitioning() {
+    source_module "partitioning.sh"
+}
+
+load_tier0() {
+    source_module "tier0.sh"
+}
+
+load_tier1() {
+    source_module "tier1.sh"
+}
+
+load_chroot() {
+    source_module "chroot.sh"
+}
+
+load_bootloader() {
+    source_module "bootloader.sh"
+}
+
+load_desktop() {
+    source_module "60-desktop.sh"
 }
 
 save_configuration() {
@@ -345,50 +125,171 @@ DISK="$DISK"
 HOSTNAME="$HOSTNAME"
 USERNAME="$USERNAME"
 TIMEZONE="$TIMEZONE"
+LOCALE="$LOCALE"
+KEYMAP="$KEYMAP"
 GPU_TYPE="$GPU_TYPE"
 DESKTOP_ENV="$DESKTOP_ENV"
 SECURE_BOOT="$SECURE_BOOT"
-LOCALE="${LOCALE:-en_US.UTF-8}"
-KEYMAP="${KEYMAP:-us}"
 EOF
     chmod 600 "$CONFIG_FILE"
 }
 
+load_configuration() {
+    if [[ ! -f "$CONFIG_FILE" ]]; then
+        log_fatal "Config not found: $CONFIG_FILE"
+        exit 1
+    fi
+    source "$CONFIG_FILE"
+}
+
+gather_user_configuration() {
+    log_info "Gathering installation configuration..."
+
+    if [[ -f "$CONFIG_FILE" ]]; then
+        prompt_value "Resume with existing configuration? (y/N): " resume "n"
+        if [[ "$resume" =~ ^[Yy]$ ]]; then
+            load_configuration
+            SECURE_BOOT="${SECURE_BOOT:-n}"
+            log_success "Configuration loaded"
+            return
+        fi
+    fi
+
+    echo ""
+    echo "Available disks:"
+    lsblk -d -o NAME,SIZE,TYPE,MODEL | grep disk || true
+    echo ""
+
+    while true; do
+        prompt_value "Enter target disk (e.g., sda, nvme0n1): " disk_input ""
+        DISK="/dev/${disk_input}"
+        if validate_disk "$DISK"; then
+            break
+        fi
+        log_error "Invalid disk selection. Please try again."
+    done
+
+    while true; do
+        prompt_value "Hostname [logos]: " HOSTNAME "logos"
+        if validate_hostname "$HOSTNAME"; then
+            break
+        fi
+        log_error "Invalid hostname. Please try again."
+    done
+
+    while true; do
+        prompt_value "Username [logos]: " USERNAME "logos"
+        if validate_username "$USERNAME"; then
+            break
+        fi
+        log_error "Invalid username. Please try again."
+    done
+
+    while true; do
+        prompt_value "Timezone (e.g., America/New_York) [America/New_York]: " TIMEZONE "America/New_York"
+        if validate_timezone "$TIMEZONE"; then
+            break
+        fi
+        log_error "Invalid timezone. Please try again."
+    done
+
+    prompt_value "Locale [en_US.UTF-8]: " LOCALE "en_US.UTF-8"
+    prompt_value "Keyboard layout [us]: " KEYMAP "us"
+
+    while true; do
+        prompt_secret "LUKS encryption passphrase (20+ chars): " LUKS_PASS
+        if ! validate_luks_passphrase "$LUKS_PASS"; then
+            continue
+        fi
+        prompt_secret "Confirm passphrase: " LUKS_PASS_CONFIRM
+        if [[ "$LUKS_PASS" == "$LUKS_PASS_CONFIRM" ]]; then
+            break
+        fi
+        log_error "Passphrases do not match."
+    done
+
+    while true; do
+        prompt_secret "Root password: " ROOT_PASS
+        prompt_secret "Confirm root password: " ROOT_PASS_CONFIRM
+        [[ "$ROOT_PASS" == "$ROOT_PASS_CONFIRM" ]] && break
+        log_error "Passwords do not match."
+    done
+
+    while true; do
+        prompt_secret "User password: " USER_PASS
+        prompt_secret "Confirm user password: " USER_PASS_CONFIRM
+        [[ "$USER_PASS" == "$USER_PASS_CONFIRM" ]] && break
+        log_error "Passwords do not match."
+    done
+
+    echo ""
+    echo "GPU Type:"
+    echo "1) AMD (Recommended)"
+    echo "2) NVIDIA"
+    echo "3) Intel"
+    echo "4) None"
+    prompt_value "Selection [1]: " gpu_choice "1"
+    case "$gpu_choice" in
+        1) GPU_TYPE="amd" ;;
+        2) GPU_TYPE="nvidia" ;;
+        3) GPU_TYPE="intel" ;;
+        *) GPU_TYPE="none" ;;
+    esac
+
+    echo ""
+    echo "Desktop Environment:"
+    echo "1) GNOME"
+    echo "2) KDE Plasma"
+    echo "3) XFCE"
+    echo "4) i3-wm"
+    echo "5) None (server)"
+    prompt_value "Selection [1]: " de_choice "1"
+    case "$de_choice" in
+        1) DESKTOP_ENV="gnome" ;;
+        2) DESKTOP_ENV="kde" ;;
+        3) DESKTOP_ENV="xfce" ;;
+        4) DESKTOP_ENV="i3" ;;
+        *) DESKTOP_ENV="none" ;;
+    esac
+
+    echo ""
+    prompt_value "Configure Secure Boot with sbctl? (y/N): " SECURE_BOOT "n"
+
+    save_configuration
+    log_success "Configuration saved to $CONFIG_FILE"
+}
+
 confirm_installation() {
     echo ""
-    echo "╔══════════════════════════════════════════════════════════════╗"
-    echo "║            Installation Configuration Summary               ║"
-    echo "╚══════════════════════════════════════════════════════════════╝"
+    echo "============================================================"
+    echo "Installation Configuration Summary"
+    echo "============================================================"
+    echo "Target Disk:    $DISK"
+    echo "Hostname:       $HOSTNAME"
+    echo "Username:       $USERNAME"
+    echo "Timezone:       $TIMEZONE"
+    echo "Locale:         $LOCALE"
+    echo "Keyboard:       $KEYMAP"
+    echo "GPU:            $GPU_TYPE"
+    echo "Desktop:        $DESKTOP_ENV"
+    echo "Secure Boot:    $SECURE_BOOT"
+    echo "============================================================"
     echo ""
-    echo "  Target Disk:    $DISK"
-    echo "  Hostname:       $HOSTNAME"
-    echo "  Username:       $USERNAME"
-    echo "  Timezone:       $TIMEZONE"
-    echo "  GPU:            $GPU_TYPE"
-    echo "  Desktop:        $DESKTOP_ENV"
+    echo "WARNING: ALL DATA ON $DISK WILL BE PERMANENTLY ERASED!"
     echo ""
-    echo -e "${RED}⚠ ALL DATA ON $DISK WILL BE PERMANENTLY ERASED! ⚠${NC}"
-    echo ""
-    read -p "Type 'YES' in capital letters to proceed: " confirm
+    prompt_value "Type 'YES' in capital letters to proceed: " confirm ""
 
     if [[ "$confirm" != "YES" ]]; then
-        log_warn "Installation cancelled by user"
+        log_warn "Installation cancelled by user."
         exit 0
     fi
 }
 
 finalize_installation() {
     log_info "Finalizing installation..."
-
-    # Unmount filesystems
-    log_info "Unmounting filesystems..."
     sync
     umount -R /mnt || log_warn "Some filesystems failed to unmount"
-
-    # Close encrypted partition
-    log_info "Closing encrypted partition..."
     cryptsetup close cryptroot || log_warn "Failed to close cryptroot"
-
     log_success "Installation finalized"
 }
 
@@ -398,71 +299,167 @@ installation_complete() {
     clear
     cat << 'EOF'
 
-╔══════════════════════════════════════════════════════════════════════════════╗
-║                                                                              ║
-║                     LogOS Installation Complete!                           ║
-║                                                                              ║
-╚══════════════════════════════════════════════════════════════════════════════╝
+============================================================
+               LogOS Installation Complete!
+============================================================
 
 Next Steps:
 
-1. IMPORTANT: Remove the installation media (USB/ISO) from your system
+1. Remove the installation media (USB/ISO)
 2. Reboot the system:
 
    # reboot
 
-3. Your system should automatically boot into LogOS (GRUB bootloader)
-4. At the GRUB menu, select your Ringed City profile:
-   - Midir (Balanced) - Recommended for daily use
-   - Gael (Maximum Security) - For sensitive operations
-   - Halflight (Performance) - For gaming/media production
+3. Select your Ringed City profile in GRUB:
+   - Midir (Balanced)
+   - Gael (Maximum Security)
+   - Halflight (Performance)
 
-5. Login with your username and password
+4. Login with your username and password
 
-6. If you chose "None" for desktop, install it later:
+5. If you chose "None" for desktop, install it later:
 
    $ cd LogOS/installer/modules
    $ ./tier2-standalone.sh
 
-7. Optionally install specialized tools:
+6. Optional: install specialized tools:
 
    $ ./tier3-standalone.sh
-
-If the system boots back to the installation media instead of LogOS:
-- Check your BIOS/UEFI boot order settings
-- Ensure "LogOS" is set as the first boot option
-- Disable boot from USB/CD in BIOS if needed
-
-Documentation:
-- Full guide: /usr/share/doc/logos/LogOS_Build_Guide_2025_MASTER_v7.md
-- Quick reference: /usr/share/doc/logos/QUICKSTART.md
-
-Support:
-- GitHub: https://github.com/crussella0129/LogOS
-- Issues: https://github.com/crussella0129/LogOS/issues
-
 EOF
 
     log_summary "SUCCESS" "$duration"
-
+    echo ""
     echo -e "${GREEN}Installation completed successfully in ${duration}s${NC}"
     echo ""
 }
 
-################################################################################
-# Entry Point
-################################################################################
+run_preflight() {
+    load_preflight
+    if command -v module_00_preflight &>/dev/null; then
+        module_00_preflight
+    else
+        log_warn "Pre-flight module not found, using compatibility mode"
+        validate_install_environment || exit 1
+    fi
+}
 
-# Load modules
-load_modules
+run_install() {
+    start_progress "$TOTAL_STEPS"
 
-# Run main installation
+    next_step
+    run_preflight
+    complete_step
+
+    log_step "1" "Configuration"
+    gather_user_configuration
+    confirm_installation
+    next_step
+    complete_step
+
+    next_step
+    log_step "2" "Disk Preparation"
+    load_partitioning
+    prepare_disk
+    create_partitions
+    setup_encryption
+    mount_filesystems
+    complete_step
+
+    next_step
+    log_step "3" "Base System Installation (Tier 0)"
+    load_tier0
+    install_tier0
+    complete_step
+
+    next_step
+    log_step "4" "Security Infrastructure (Tier 1)"
+    load_tier1
+    install_tier1
+    complete_step
+
+    next_step
+    log_step "5" "System Configuration"
+    generate_fstab
+    load_chroot
+    configure_system_chroot
+    complete_step
+
+    next_step
+    log_step "6" "Desktop Environment Installation"
+    load_desktop
+    install_desktop
+    complete_step
+
+    next_step
+    log_step "7" "Bootloader Installation"
+    load_bootloader
+    install_bootloader
+    create_ringed_city_profiles
+    complete_step
+
+    next_step
+    log_step "8" "Finalization"
+    finalize_installation
+    complete_step
+
+    installation_complete
+}
+
+show_logs() {
+    echo "Install log: ${INSTALL_LOG}"
+    echo "Verbose log: ${INSTALL_LOG_VERBOSE}"
+}
+
+usage() {
+    cat << 'EOF'
+LogOS Installer
+
+Usage:
+  ./logos-install.sh [command]
+
+Commands:
+  run       Start a full install (default)
+  resume    Resume from an existing config file
+  config    Collect and save configuration only
+  validate  Run pre-flight checks only
+  logs      Show log file locations
+  help      Show this help text
+EOF
+}
+
+main() {
+    require_tty
+    print_banner
+    prompt_enter
+
+    local command=${1:-run}
+    case "$command" in
+        run)
+            run_install
+            ;;
+        resume)
+            load_configuration
+            confirm_installation
+            run_install
+            ;;
+        config)
+            gather_user_configuration
+            ;;
+        validate)
+            run_preflight
+            ;;
+        logs)
+            show_logs
+            ;;
+        help|--help|-h)
+            usage
+            ;;
+        *)
+            echo "Unknown command: $command" >&2
+            usage
+            exit 1
+            ;;
+    esac
+}
+
 main "$@"
-
-# Exit successfully
-exit 0
-
-
-
-
-

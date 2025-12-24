@@ -10,41 +10,41 @@ repo root.
 ## Launch
 
 ```bash
-cd LogOS/Installer-Proto
-chmod +x logos-installer.sh
-sudo ./logos-installer.sh
+cd LogOS/installer
+chmod +x logos-install.sh
+sudo ./logos-install.sh
 ```
 
 ## Commands
 
 ```bash
-./logos-installer.sh run
+./logos-install.sh run
 ```
 Start a full install (default). Prompts for disk, user info, GPU, GUI, and
 secure boot, then runs the full install pipeline.
 
 ```bash
-./logos-installer.sh resume
+./logos-install.sh resume
 ```
 Resume an install using the last saved config at `/tmp/logos-install.conf`.
 
 ```bash
-./logos-installer.sh config
+./logos-install.sh config
 ```
 Collect and save configuration only (no disk changes).
 
 ```bash
-./logos-installer.sh validate
+./logos-install.sh validate
 ```
 Run pre-flight checks only (UEFI, network, required tools, etc.).
 
 ```bash
-./logos-installer.sh logs
+./logos-install.sh logs
 ```
 Show install log locations.
 
 ```bash
-./logos-installer.sh help
+./logos-install.sh help
 ```
 Show help text.
 

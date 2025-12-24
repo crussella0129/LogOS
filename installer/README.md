@@ -198,8 +198,7 @@ Switch profiles at boot via GRUB menu.
 
 ```
 installer/
-- install-logos.sh              # Main installer script
-- logos-install.sh              # Orchestrated installer (recommended)
+- logos-install.sh              # Main installer entry point
 - lib/
   - common.sh                   # Common functions (logging, colors, etc.)
   - validation.sh               # Input validation functions
