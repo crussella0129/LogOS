@@ -71,14 +71,19 @@ main() {
     source "${SCRIPT_DIR}/modules/chroot.sh"
     configure_system_chroot
 
-    # Phase 7: Bootloader
-    print_section "Phase 7: Bootloader Installation"
+    # Phase 7: Desktop environment
+    print_section "Phase 7: Desktop Environment Installation"
+    source "${SCRIPT_DIR}/modules/60-desktop.sh"
+    install_desktop
+
+    # Phase 8: Bootloader
+    print_section "Phase 8: Bootloader Installation"
     source "${SCRIPT_DIR}/modules/bootloader.sh"
     install_bootloader
     create_ringed_city_profiles
 
-    # Phase 8: Post-installation
-    print_section "Phase 8: Finalization"
+    # Phase 9: Post-installation
+    print_section "Phase 9: Finalization"
     finalize_installation
 
     # Installation complete
@@ -354,9 +359,10 @@ Next Steps:
    - Midir (Balanced) - Recommended for daily use
    - Halflight (Performance)
 
-5. After first boot, run post-installation setup:
-   - Install Tier 2 (Desktop): ./installer/modules/tier2-standalone.sh
-   - Install Tier 3 (Specialized): ./installer/modules/tier3-standalone.sh
+5. If you chose "None" for desktop, install Tier 2 later:
+   - ./installer/modules/tier2-standalone.sh
+6. Optional: install Tier 3 (Specialized):
+   - ./installer/modules/tier3-standalone.sh
 
 If the system boots back to the installation media instead of LogOS:
 - Check your BIOS/UEFI boot order settings

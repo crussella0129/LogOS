@@ -403,7 +403,7 @@ Next Steps:
 
 5. Login with your username and password
 
-6. After first boot, install desktop environment (if selected):
+6. If you chose "None" for desktop, install it later:
 
    $ cd LogOS/installer/modules
    $ ./tier2-standalone.sh
