@@ -1,0 +1,56 @@
+# LogOS Installer-Proto
+
+This is a hardened, interactive installer entrypoint that preserves the same
+features as the current LogOS installer (GPU selection, secure boot, and desktop
+environment choice) while providing a safer command-driven interface.
+
+It reuses the existing modules in `installer/` and should be run from the LogOS
+repo root.
+
+## Launch
+
+```bash
+cd LogOS/Installer-Proto
+chmod +x logos-installer.sh
+sudo ./logos-installer.sh
+```
+
+## Commands
+
+```bash
+./logos-installer.sh run
+```
+Start a full install (default). Prompts for disk, user info, GPU, GUI, and
+secure boot, then runs the full install pipeline.
+
+```bash
+./logos-installer.sh resume
+```
+Resume an install using the last saved config at `/tmp/logos-install.conf`.
+
+```bash
+./logos-installer.sh config
+```
+Collect and save configuration only (no disk changes).
+
+```bash
+./logos-installer.sh validate
+```
+Run pre-flight checks only (UEFI, network, required tools, etc.).
+
+```bash
+./logos-installer.sh logs
+```
+Show install log locations.
+
+```bash
+./logos-installer.sh help
+```
+Show help text.
+
+## Notes
+
+- Requires an Arch Linux live environment and UEFI boot mode.
+- The installer expects internet connectivity for package downloads.
+- Config file: `/tmp/logos-install.conf`
+- Logs: `/tmp/logos-install.log` and `/tmp/logos-install-verbose.log`
