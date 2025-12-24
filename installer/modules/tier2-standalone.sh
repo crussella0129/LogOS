@@ -18,6 +18,7 @@ log() { echo -e "${BLUE}[$(date '+%H:%M:%S')]${NC} $*"; }
 success() { echo -e "${GREEN}✓${NC} $*"; }
 error() { echo -e "${RED}✗${NC} $*" >&2; }
 warning() { echo -e "${YELLOW}⚠${NC} $*"; }
+info() { echo -e "${BLUE}?${NC} $*"; }
 
 # Check if running as normal user (not root)
 if [[ $EUID -eq 0 ]]; then

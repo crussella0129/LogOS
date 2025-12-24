@@ -8,15 +8,15 @@ This installer automates the complete LogOS installation process from bare metal
 
 ## Features
 
-- ✅ **Fully Automated**: Guided installation with minimal user input
-- 🔐 **Security First**: LUKS2 encryption, AppArmor, audit, UFW, fail2ban pre-configured
-- 🎯 **Tiered Installation**: Modular approach (Tier 0: Boot → Tier 1: Security → Tier 2: Desktop → Tier 3: Specialized)
-- 🛡️ **Ringed City Profiles**: Three security/performance boot profiles (Gael, Midir, Halflight)
-- 📦 **Btrfs with Snapshots**: Automatic snapshots, rollback capability, bitrot protection
-- 🎨 **Multiple Desktop Environments**: GNOME, KDE, XFCE, i3-wm, or headless
-- ⚡ **GPU Support**: AMD (recommended), NVIDIA, Intel auto-detection
-- 🎭 **Professional Branding**: Custom GRUB boot splash and desktop wallpaper with LogOS logo
-- 🔧 **Specialized Tools**: CAD, 3D printing, gaming, security research, scientific computing, and more
+- Fully automated guided installation with minimal user input
+- LUKS2 encryption, AppArmor, audit, UFW, fail2ban pre-configured
+- Tiered installation: Tier 0 (Boot), Tier 1 (Security), Tier 2 (Desktop), Tier 3 (Specialized)
+- Ringed City profiles: Gael, Midir, Halflight
+- Btrfs subvolumes with snapshots and rollback
+- Multiple desktop environments: GNOME, KDE, XFCE, i3-wm, or headless
+- GPU support: AMD, NVIDIA, Intel auto-detection
+- Branding: custom GRUB splash and desktop wallpaper
+- Specialized tools: CAD, 3D printing, gaming, security research, scientific computing
 
 ## Quick Start
 
@@ -57,14 +57,14 @@ iwctl
 pacman -Sy git
 git clone https://github.com/crussella0129/LogOS.git
 cd LogOS/installer
-chmod +x install-logos.sh
+chmod +x logos-install.sh
 ```
 
 #### 3. Run the Installer
 
 ```bash
 # Start installation
-./install-logos.sh
+./logos-install.sh
 ```
 
 The installer will:
@@ -162,17 +162,17 @@ Switch profiles at boot via GRUB menu.
 ### Partition Scheme
 
 ```
-/dev/sdX1    1GB     FAT32    /boot/efi    (EFI System Partition)
-/dev/sdX2    4GB     ext4     /boot        (Unencrypted boot)
-/dev/sdX3    Rest    LUKS2    (Encrypted container)
-  └─ Btrfs subvolumes:
-     ├─ @           →  /              (Root)
-     ├─ @home       →  /home          (User data)
-     ├─ @snapshots  →  /.snapshots    (Snapper snapshots)
-     ├─ @canon      →  ~/Documents    (Cold Canon - copies=2)
-     ├─ @mesh       →  ~/Sync         (Warm Mesh)
-     ├─ @log        →  /var/log       (Logs)
-     └─ @cache      →  /var/cache     (Cache)
+/dev/sdX1   1GB   FAT32   /boot/efi   (EFI System Partition)
+/dev/sdX2   4GB   ext4    /boot       (Unencrypted boot)
+/dev/sdX3   Rest  LUKS2   (Encrypted container)
+  - Btrfs subvolumes:
+    - @          -> /
+    - @home      -> /home
+    - @snapshots -> /.snapshots
+    - @canon     -> /home/<user>/Documents (Cold Canon, copies=2)
+    - @mesh      -> /home/<user>/Sync (Warm Mesh)
+    - @log       -> /var/log
+    - @cache     -> /var/cache
 ```
 
 ### Security Features
@@ -198,19 +198,24 @@ Switch profiles at boot via GRUB menu.
 
 ```
 installer/
-├── install-logos.sh              # Main installer script
-├── lib/
-│   ├── common.sh                 # Common functions (logging, colors, etc.)
-│   └── validation.sh             # Input validation functions
-├── modules/
-│   ├── partitioning.sh           # Disk partitioning and encryption
-│   ├── tier0.sh                  # Tier 0: Boot-critical packages
-│   ├── tier1.sh                  # Tier 1: Security infrastructure
-│   ├── chroot.sh                 # System configuration in chroot
-│   ├── bootloader.sh             # GRUB and Ringed City profiles
-│   ├── tier2-standalone.sh       # Post-install: Desktop & workstation
-│   └── tier3-standalone.sh       # Post-install: Specialized tools
-└── README.md                     # This file
+- install-logos.sh              # Main installer script
+- logos-install.sh              # Orchestrated installer (recommended)
+- lib/
+  - common.sh                   # Common functions (logging, colors, etc.)
+  - validation.sh               # Input validation functions
+  - logging.sh                  # Logging subsystem
+  - error-handling.sh           # Error handling and cleanup
+- modules/
+  - 00-preflight.sh             # System validation
+  - partitioning.sh             # Disk partitioning and encryption
+  - tier0.sh                    # Tier 0: Boot-critical packages
+  - tier1.sh                    # Tier 1: Security infrastructure
+  - chroot.sh                   # System configuration in chroot
+  - bootloader.sh               # GRUB and Ringed City profiles
+  - 60-desktop.sh               # Desktop environment installation
+  - tier2-standalone.sh         # Post-install: Desktop & workstation
+  - tier3-standalone.sh         # Post-install: Specialized tools
+- README.md                     # This file
 ```
 
 ## Troubleshooting
@@ -290,7 +295,7 @@ sudo snapper list
 sudo snapper -c root create --description "Before update"
 
 # Rollback to snapshot (via GRUB)
-# Reboot → Advanced options → Select snapshot
+# Reboot -> Advanced options -> Select snapshot
 ```
 
 ### Power Management
@@ -346,3 +351,5 @@ See main repository LICENSE file.
 *"In the beginning was the Logos..."*
 
 **LogOS**: An Ontology Substrate for human knowledge, creation, and survival.
+
+

@@ -97,13 +97,13 @@ mount_filesystems() {
 
     # Ensure vfat kernel module is loaded
     log "Loading vfat kernel module..."
-    if ! modprobe vfat 2>&1 | tee -a "$INSTALL_LOG"; then
+    if ! modprobe vfat >> "$INSTALL_LOG" 2>&1; then
         warning "vfat module already loaded or built-in"
     fi
 
     # Format EFI partition
     log "Formatting EFI partition (FAT32)..."
-    if ! mkfs.fat -F32 -n EFI "$EFI_PART" 2>&1 | tee -a "$INSTALL_LOG" | grep -q "mkfs.fat"; then
+    if ! mkfs.fat -F32 -n EFI "$EFI_PART" >> "$INSTALL_LOG" 2>&1; then
         error "Failed to format EFI partition $EFI_PART"
         return 1
     fi
@@ -222,7 +222,7 @@ mount_filesystems() {
 
     if mountpoint -q /mnt/boot/efi 2>/dev/null; then
         warning "EFI mount point already mounted, unmounting..."
-        if ! umount /mnt/boot/efi 2>&1 | tee -a "$INSTALL_LOG"; then
+        if ! umount /mnt/boot/efi >> "$INSTALL_LOG" 2>&1; then
             error "Failed to unmount existing EFI mount"
             return 1
         fi
@@ -230,7 +230,7 @@ mount_filesystems() {
 
     if mountpoint -q /mnt/boot 2>/dev/null; then
         warning "Boot mount point already mounted, unmounting..."
-        if ! umount /mnt/boot 2>&1 | tee -a "$INSTALL_LOG"; then
+        if ! umount /mnt/boot >> "$INSTALL_LOG" 2>&1; then
             error "Failed to unmount existing boot mount"
             return 1
         fi
@@ -278,7 +278,7 @@ mount_filesystems() {
 
     # Mount boot partition
     log "Mounting boot partition to /mnt/boot..."
-    if ! mount -t ext4 -v "$BOOT_PART" /mnt/boot 2>&1 | tee -a "$INSTALL_LOG"; then
+    if ! mount -t ext4 -v "$BOOT_PART" /mnt/boot >> "$INSTALL_LOG" 2>&1; then
         error "Failed to mount boot partition $BOOT_PART"
         log "Mount debugging information:"
         log "  Device: $BOOT_PART"
@@ -303,7 +303,7 @@ mount_filesystems() {
 
     # Mount EFI partition
     log "Mounting EFI partition to /mnt/boot/efi..."
-    if ! mount -t vfat -v "$EFI_PART" /mnt/boot/efi 2>&1 | tee -a "$INSTALL_LOG"; then
+    if ! mount -t vfat -v "$EFI_PART" /mnt/boot/efi >> "$INSTALL_LOG" 2>&1; then
         error "Failed to mount EFI partition $EFI_PART"
         log "Mount debugging information:"
         log "  Device: $EFI_PART"

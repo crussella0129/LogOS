@@ -21,8 +21,8 @@ iwctl
 pacman -Sy git
 git clone https://github.com/crussella0129/LogOS.git
 cd LogOS/installer
-chmod +x install-logos.sh
-./install-logos.sh
+chmod +x logos-install.sh
+./logos-install.sh
 ```
 
 ### 4. Follow Prompts
@@ -36,6 +36,7 @@ You'll be asked for:
 - Passwords
 - GPU type
 - Desktop environment
+- Secure Boot (optional)
 
 ### 5. Reboot
 
@@ -65,22 +66,22 @@ chmod +x tier3-standalone.sh
 ## What Gets Installed
 
 ### Core System (Automatic)
-- ✅ LUKS2 encrypted disk
-- ✅ Btrfs filesystem with subvolumes
-- ✅ Triple-kernel architecture (linux, linux-lts, linux-zen)
-- ✅ GRUB with Ringed City boot profiles
-- ✅ Security hardening (AppArmor, audit, UFW, fail2ban)
-- ✅ Network configuration (NetworkManager)
-- ✅ Base system tools
+- LUKS2 encrypted disk
+- Btrfs filesystem with subvolumes
+- Triple-kernel architecture (linux, linux-lts, linux-zen)
+- GRUB with Ringed City boot profiles
+- Security hardening (AppArmor, audit, UFW, fail2ban)
+- Network configuration (NetworkManager)
+- Base system tools
 
 ### Tier 2 - Desktop & Workstation (tier2-standalone.sh)
-- ✅ Graphics drivers (AMD/NVIDIA/Intel)
-- ✅ Desktop environment (GNOME/KDE/XFCE/i3)
-- ✅ Essential apps (Firefox, LibreOffice, GIMP, etc.)
-- ✅ Development tools (Git, Python, Node.js, Rust, Go, Docker, VS Code)
-- ✅ Terminal enhancements (zsh, tmux, htop, fzf, etc.)
-- ✅ Fonts
-- ✅ Snapshot system (Snapper)
+- Graphics drivers (AMD/NVIDIA/Intel)
+- Desktop environment (GNOME/KDE/XFCE/i3)
+- Essential apps (Firefox, LibreOffice, GIMP, etc.)
+- Development tools (Git, Python, Node.js, Rust, Go, Docker, VS Code)
+- Terminal enhancements (zsh, tmux, htop, fzf, etc.)
+- Fonts
+- Snapshot system (Snapper)
 
 ### Tier 3 - Specialized Tools (tier3-standalone.sh)
 Choose what you need:
@@ -94,7 +95,7 @@ Choose what you need:
 - Media Production (OBS, Kdenlive, Audacity, Ardour)
 - Power Management (TLP, powertop)
 
-## Boot Profiles (Ringed City)
+## Boot Profiles (Ringed City) (Ringed City)
 
 At GRUB menu, choose your profile:
 
@@ -119,7 +120,7 @@ sudo pacman -Syu
 yay -Syu
 
 # Boot into snapshot (via GRUB advanced options)
-# Reboot → Advanced options → Select snapshot
+# Reboot -> Advanced options -> Select snapshot
 ```
 
 ## Troubleshooting
@@ -140,7 +141,7 @@ lsblk
 ```
 
 ### "Forgot LUKS passphrase"
-⚠️ **No recovery possible** - LUKS encryption is designed to be unrecoverable without passphrase
+Note: No recovery possible - LUKS encryption is designed to be unrecoverable without the passphrase
 
 ### "Installation failed"
 Check `/tmp/logos-install.log` for errors
@@ -177,6 +178,8 @@ Total: **30-60 minutes** for complete installation
 
 ---
 
-**Happy Installing! 🚀**
+**Happy Installing!
 
 *LogOS - Ontology Substrate Operating System*
+
+

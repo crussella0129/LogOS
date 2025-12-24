@@ -93,12 +93,13 @@ show_progress() {
 spinner() {
     local pid=$1
     local message=$2
-    local spin='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+    local spin='|/-\\'
     local i=0
+    local spin_len=${#spin}
 
     echo -n "$message "
     while kill -0 $pid 2>/dev/null; do
-        i=$(( (i+1) %10 ))
+        i=$(( (i+1) % spin_len ))
         printf "\r$message ${spin:$i:1}"
         sleep 0.1
     done
@@ -321,3 +322,4 @@ cleanup_on_exit() {
 }
 
 trap cleanup_on_exit EXIT
+
