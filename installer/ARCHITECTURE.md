@@ -16,53 +16,38 @@ The LogOS installer is a production-grade, modular installation system designed 
 
 ```
 installer/
-├── logos-install.sh           # Main orchestrator
-├── install-logos.sh           # Legacy entry point (compatibility)
-│
-├── lib/                       # Core libraries
-│   ├── common.sh             # Shared utilities
-│   ├── validation.sh         # Input validation
-│   ├── logging.sh            # Logging subsystem
-│   └── error-handling.sh     # Error handling & cleanup
-│
-├── modules/                   # Installation modules
-│   ├── 00-preflight.sh       # System validation
-│   ├── 10-disk-setup.sh      # Partitioning (planned)
-│   ├── 20-base-install.sh    # Base system (planned)
-│   ├── 30-kernel-profiles.sh # Ringed City profiles (planned)
-│   ├── 40-security.sh        # Security hardening (planned)
-│   ├── 50-knowledge.sh       # Knowledge topology (planned)
-│   ├── 60-desktop.sh         # Desktop environment (planned)
-│   ├── 70-finalize.sh        # Cleanup & verification (planned)
-│   │
-│   └── [legacy modules]      # Existing modules (being migrated)
-│       ├── partitioning.sh
-│       ├── tier0.sh
-│       ├── tier1.sh
-│       ├── chroot.sh
-│       ├── bootloader.sh
-│       ├── tier2-standalone.sh
-│       └── tier3-standalone.sh
-│
-├── profiles/                  # Ringed City configurations
-│   ├── gael.conf             # Maximum security profile
-│   ├── midir.conf            # Balanced profile
-│   └── halflight.conf        # Performance profile
-│
-├── templates/                 # System configuration templates
-│   ├── fstab.template
-│   ├── grub.template
-│   ├── apparmor/             # AppArmor profiles
-│   ├── systemd/              # Systemd units
-│   └── grub/                 # GRUB themes
-│
-├── assets/                    # Installation assets
-│   └── branding/
-│       ├── logos-boot.png
-│       ├── logos-wallpaper.png
-│       └── README.md
-│
-└── README.md                  # Main documentation
+- logos-install.sh           # Main orchestrator
+- install-logos.sh           # Legacy entry point (compatibility)
+- lib/                       # Core libraries
+  - common.sh                # Shared utilities
+  - validation.sh            # Input validation
+  - logging.sh               # Logging subsystem
+  - error-handling.sh        # Error handling and cleanup
+- modules/                   # Installation modules
+  - 00-preflight.sh          # System validation
+  - partitioning.sh          # Disk partitioning and encryption
+  - tier0.sh                 # Boot-critical packages
+  - tier1.sh                 # Security hardening
+  - chroot.sh                # System configuration in chroot
+  - bootloader.sh            # GRUB and Ringed City profiles
+  - 60-desktop.sh            # Desktop environment installation
+  - tier2-standalone.sh      # Post-install: Desktop & workstation
+  - tier3-standalone.sh      # Post-install: Specialized tools
+- profiles/                  # Ringed City configurations
+  - gael.conf                # Maximum security profile
+  - midir.conf               # Balanced profile
+  - halflight.conf           # Performance profile
+- templates/                 # System configuration templates
+  - fstab.template
+  - grub.template
+  - issue.template
+  - os-release.template
+- assets/                    # Installation assets
+  - branding/
+    - logos-boot.png
+    - logos-wallpaper.png
+    - README.md
+- README.md                  # Main documentation
 ```
 
 ## Module System
@@ -351,3 +336,4 @@ LOGOS_LOG_LEVEL=4  # FATAL
 
 For usage documentation, see [README.md](README.md).
 For quick start, see [QUICKSTART.md](QUICKSTART.md).
+

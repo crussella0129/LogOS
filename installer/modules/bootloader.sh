@@ -103,6 +103,9 @@ EOF
 
     # Verify and fix EFI boot entry
     setup_efi_boot_entry
+
+    # Optional Secure Boot configuration
+    configure_secure_boot
 }
 
 install_grub_branding() {
@@ -319,6 +322,7 @@ configure_secure_boot() {
         info "8. Reboot and enable Secure Boot in BIOS"
 
         # Create pacman hook for auto-signing (in chroot)
+        mkdir -p /mnt/etc/pacman.d/hooks
         cat > /mnt/etc/pacman.d/hooks/99-secureboot.hook <<'EOF'
 [Trigger]
 Operation = Install

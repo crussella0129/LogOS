@@ -67,12 +67,12 @@ EOF
     echo "This installer will guide you through installing LogOS, a hardened"
     echo "Arch Linux-based system with:"
     echo ""
-    echo "  • Triple-kernel architecture (Gael/Midir/Halflight profiles)"
-    echo "  • Full-disk encryption with LUKS2"
-    echo "  • Btrfs with snapshots and rollback capability"
-    echo "  • AppArmor, audit, UFW, fail2ban security"
-    echo "  • Knowledge preservation topology (Cold Canon/Warm Mesh)"
-    echo "  • Professional branding and boot experience"
+    echo "  - Triple-kernel architecture (Gael/Midir/Halflight profiles)"
+    echo "  - Full-disk encryption with LUKS2"
+    echo "  - Btrfs with snapshots and rollback capability"
+    echo "  - AppArmor, audit, UFW, fail2ban security"
+    echo "  - Knowledge preservation topology (Cold Canon/Warm Mesh)"
+    echo "  - Professional branding and boot experience"
     echo ""
     echo "Installation time: 15-30 minutes (depending on internet speed)"
     echo ""
@@ -89,13 +89,12 @@ load_modules() {
     # Load modules in order
     local modules=(
         "00-preflight.sh"
-        "10-disk-setup.sh"
-        "20-base-install.sh"
-        "30-kernel-profiles.sh"
-        "40-security.sh"
-        "50-knowledge.sh"
+        "partitioning.sh"
+        "tier0.sh"
+        "tier1.sh"
+        "chroot.sh"
+        "bootloader.sh"
         "60-desktop.sh"
-        "70-finalize.sh"
     )
 
     for module in "${modules[@]}"; do
@@ -213,6 +212,7 @@ gather_user_configuration() {
         read -p "Resume with existing configuration? (y/N): " resume
         if [[ "$resume" =~ ^[Yy]$ ]]; then
             source "$CONFIG_FILE"
+            SECURE_BOOT="${SECURE_BOOT:-n}"
             log_success "Configuration loaded"
             return
         fi
@@ -311,6 +311,11 @@ gather_user_configuration() {
         *) DESKTOP_ENV="none" ;;
     esac
 
+    # Secure Boot
+    echo ""
+    read -p "Configure Secure Boot with sbctl? (y/N): " SECURE_BOOT
+    SECURE_BOOT="${SECURE_BOOT:-n}"
+
     # Save configuration
     save_configuration
 
@@ -326,6 +331,7 @@ USERNAME="$USERNAME"
 TIMEZONE="$TIMEZONE"
 GPU_TYPE="$GPU_TYPE"
 DESKTOP_ENV="$DESKTOP_ENV"
+SECURE_BOOT="$SECURE_BOOT"
 LOCALE="${LOCALE:-en_US.UTF-8}"
 KEYMAP="${KEYMAP:-us}"
 EOF
@@ -378,7 +384,7 @@ installation_complete() {
 
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║                                                                              ║
-║                     LogOS Installation Complete! 🎉                          ║
+║                     LogOS Installation Complete!                           ║
 ║                                                                              ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 
@@ -391,9 +397,9 @@ Next Steps:
 
 3. Your system should automatically boot into LogOS (GRUB bootloader)
 4. At the GRUB menu, select your Ringed City profile:
-   • Midir (Balanced) - Recommended for daily use
-   • Gael (Maximum Security) - For sensitive operations
-   • Halflight (Performance) - For gaming/media production
+   - Midir (Balanced) - Recommended for daily use
+   - Gael (Maximum Security) - For sensitive operations
+   - Halflight (Performance) - For gaming/media production
 
 5. Login with your username and password
 
@@ -439,3 +445,8 @@ main "$@"
 
 # Exit successfully
 exit 0
+
+
+
+
+
