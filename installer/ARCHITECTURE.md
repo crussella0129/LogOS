@@ -16,8 +16,7 @@ The LogOS installer is a production-grade, modular installation system designed 
 
 ```
 installer/
-- logos-install.sh           # Main orchestrator
-- install-logos.sh           # Legacy entry point (compatibility)
+- logos-install.sh           # Main installer entry point
 - lib/                       # Core libraries
   - common.sh                # Shared utilities
   - validation.sh            # Input validation
