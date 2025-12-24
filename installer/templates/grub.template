@@ -29,7 +29,7 @@ GRUB_BACKGROUND="/boot/grub/themes/logos/logos-boot.png"
 GRUB_THEME="/boot/grub/themes/logos/theme.txt"
 
 # Terminal
-GRUB_TERMINAL_INPUT=console
+GRUB_TERMINAL_INPUT=at_keyboard
 GRUB_TERMINAL_OUTPUT=gfxterm
 
 # OS prober (for dual-boot systems)

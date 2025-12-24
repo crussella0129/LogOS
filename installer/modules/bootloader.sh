@@ -91,6 +91,8 @@ GRUB_GFXMODE=1920x1080,1024x768,auto
 GRUB_GFXPAYLOAD_LINUX=keep
 GRUB_BACKGROUND="/boot/grub/themes/logos/logos-boot.png"
 GRUB_THEME="/boot/grub/themes/logos/theme.txt"
+GRUB_TERMINAL_INPUT=at_keyboard
+GRUB_TERMINAL_OUTPUT=gfxterm
 EOF
 
     success "GRUB configuration created"
