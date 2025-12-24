@@ -76,7 +76,22 @@ EOF
     echo ""
     echo "Installation time: 15-30 minutes (depending on internet speed)"
     echo ""
-    read -p "Press ENTER to begin installation, or Ctrl+C to exit... "
+    prompt_enter
+}
+
+require_tty() {
+    if [[ ! -t 0 ]]; then
+        log_fatal "This installer requires an interactive TTY."
+        exit 1
+    fi
+}
+
+prompt_enter() {
+    local _reply
+    if ! read -r -p "Press ENTER to begin installation, or Ctrl+C to exit... " _reply; then
+        log_fatal "Input stream closed. Run from an interactive terminal."
+        exit 1
+    fi
 }
 
 ################################################################################
@@ -116,6 +131,7 @@ load_modules() {
 ################################################################################
 
 main() {
+    require_tty
     print_banner
 
     log_info "LogOS Installation Started"
