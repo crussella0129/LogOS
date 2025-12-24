@@ -1,47 +1,100 @@
-#!/bin/bash
-
+#!/usr/bin/env bash
 set -euo pipefail
+
+# -----------------------------------------------------------------------------
+# LogOS Installer (Ringed City)
+# Primary entrypoint for modular Arch-based installation.
+#
+# Robust interactive behavior:
+# - Always read prompts from /dev/tty (not stdin), so the installer remains
+#   usable even when stdin is redirected by launchers/IDEs/wrappers.
+# -----------------------------------------------------------------------------
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export SCRIPT_DIR
 
+# ---- Load libraries ----------------------------------------------------------
+# Fail fast with a clear message if dependencies are missing.
+_require_file() {
+    local f="$1"
+    if [[ ! -f "$f" ]]; then
+        echo "FATAL: Missing required file: $f" >&2
+        exit 1
+    fi
+}
+
+_require_file "${SCRIPT_DIR}/lib/common.sh"
+_require_file "${SCRIPT_DIR}/lib/logging.sh"
+_require_file "${SCRIPT_DIR}/lib/error-handling.sh"
+_require_file "${SCRIPT_DIR}/lib/validation.sh"
+
+# shellcheck source=/dev/null
 source "${SCRIPT_DIR}/lib/common.sh"
+# shellcheck source=/dev/null
 source "${SCRIPT_DIR}/lib/logging.sh"
+# shellcheck source=/dev/null
 source "${SCRIPT_DIR}/lib/error-handling.sh"
+# shellcheck source=/dev/null
 source "${SCRIPT_DIR}/lib/validation.sh"
 
-CONFIG_FILE="${CONFIG_FILE:-/tmp/logos-install.conf}"
+# ---- Config file -------------------------------------------------------------
+# If CONFIG_FILE is not set by the caller, create a secure temp file.
+if [[ -z "${CONFIG_FILE:-}" ]]; then
+    CONFIG_FILE="$(mktemp /tmp/logos-install.XXXXXX.conf)"
+    chmod 600 "$CONFIG_FILE"
+fi
+
 TOTAL_STEPS=9
 START_TIME=$(date +%s)
 
 init_logging
 register_cleanup default_cleanup
 
+# ---- TTY / prompting ---------------------------------------------------------
 require_tty() {
+    # stdin should be a TTY for the normal case
     if [[ ! -t 0 ]]; then
-        log_fatal "This installer requires an interactive TTY."
+        log_fatal "This installer requires an interactive TTY (stdin is not a TTY)."
         exit 1
+    fi
+
+    # /dev/tty should exist and be readable/writable for robust prompting
+    if [[ ! -e /dev/tty ]] || [[ ! -r /dev/tty ]] || [[ ! -w /dev/tty ]]; then
+        log_fatal "This installer requires /dev/tty for interactive prompts, but it is not available."
+        exit 1
+    fi
+}
+
+# Read a line from /dev/tty with an optional prompt
+_tty_read_line() {
+    local prompt="${1:-}"
+    local __outvar="${2:-}"
+    local value=""
+
+    if ! IFS= read -r -p "$prompt" value </dev/tty; then
+        log_fatal "Input stream closed. Run from an interactive terminal."
+        exit 1
+    fi
+
+    if [[ -n "$__outvar" ]]; then
+        printf -v "$__outvar" "%s" "$value"
+    else
+        printf "%s" "$value"
     fi
 }
 
 prompt_enter() {
-    local _reply
-    if ! read -r -p "Press ENTER to continue, or Ctrl+C to abort... " _reply; then
-        log_fatal "Input stream closed. Run from an interactive terminal."
-        exit 1
-    fi
+    local _reply=""
+    _tty_read_line "Press ENTER to continue, or Ctrl+C to abort... " _reply
 }
 
 prompt_value() {
-    local prompt=$1
-    local var=$2
-    local default=${3:-}
-    local value
+    local prompt="$1"
+    local var="$2"
+    local default="${3:-}"
+    local value=""
 
-    if ! read -r -p "$prompt" value; then
-        log_fatal "Input stream closed. Run from an interactive terminal."
-        exit 1
-    fi
+    _tty_read_line "$prompt" value
 
     if [[ -z "$value" ]]; then
         value="$default"
@@ -51,20 +104,23 @@ prompt_value() {
 }
 
 prompt_secret() {
-    local prompt=$1
-    local var=$2
-    local value
+    local prompt="$1"
+    local var="$2"
+    local value=""
 
-    if ! read -r -s -p "$prompt" value; then
-        echo ""
+    # Read from /dev/tty without echo.
+    # Note: read -s still needs a tty; redirect ensures we use /dev/tty explicitly.
+    if ! IFS= read -r -s -p "$prompt" value </dev/tty; then
+        echo "" >/dev/tty
         log_fatal "Input stream closed. Run from an interactive terminal."
         exit 1
     fi
+    echo "" >/dev/tty
 
-    echo ""
     printf -v "$var" "%s" "$value"
 }
 
+# ---- UI ----------------------------------------------------------------------
 print_banner() {
     clear
     cat << 'EOF'
@@ -78,8 +134,9 @@ EOF
     echo ""
 }
 
+# ---- Module loading ----------------------------------------------------------
 source_module() {
-    local module_name=$1
+    local module_name="$1"
     local module_path="${SCRIPT_DIR}/modules/${module_name}"
 
     if [[ ! -f "$module_path" ]]; then
@@ -87,50 +144,32 @@ source_module() {
         exit 1
     fi
 
+    # shellcheck source=/dev/null
     source "$module_path"
 }
 
-load_preflight() {
-    source_module "00-preflight.sh"
-}
+load_preflight()     { source_module "00-preflight.sh"; }
+load_partitioning()  { source_module "partitioning.sh"; }
+load_tier0()         { source_module "tier0.sh"; }
+load_tier1()         { source_module "tier1.sh"; }
+load_chroot()        { source_module "chroot.sh"; }
+load_bootloader()    { source_module "bootloader.sh"; }
+load_desktop()       { source_module "60-desktop.sh"; }
 
-load_partitioning() {
-    source_module "partitioning.sh"
-}
-
-load_tier0() {
-    source_module "tier0.sh"
-}
-
-load_tier1() {
-    source_module "tier1.sh"
-}
-
-load_chroot() {
-    source_module "chroot.sh"
-}
-
-load_bootloader() {
-    source_module "bootloader.sh"
-}
-
-load_desktop() {
-    source_module "60-desktop.sh"
-}
-
+# ---- Configuration persistence ------------------------------------------------
 save_configuration() {
-    cat > "$CONFIG_FILE" <<EOF
-# LogOS Installation Configuration
-DISK="$DISK"
-HOSTNAME="$HOSTNAME"
-USERNAME="$USERNAME"
-TIMEZONE="$TIMEZONE"
-LOCALE="$LOCALE"
-KEYMAP="$KEYMAP"
-GPU_TYPE="$GPU_TYPE"
-DESKTOP_ENV="$DESKTOP_ENV"
-SECURE_BOOT="$SECURE_BOOT"
-EOF
+    {
+        printf '# LogOS Installation Configuration\n'
+        printf 'DISK=%q\n' "$DISK"
+        printf 'HOSTNAME=%q\n' "$HOSTNAME"
+        printf 'USERNAME=%q\n' "$USERNAME"
+        printf 'TIMEZONE=%q\n' "$TIMEZONE"
+        printf 'LOCALE=%q\n' "$LOCALE"
+        printf 'KEYMAP=%q\n' "$KEYMAP"
+        printf 'GPU_TYPE=%q\n' "$GPU_TYPE"
+        printf 'DESKTOP_ENV=%q\n' "$DESKTOP_ENV"
+        printf 'SECURE_BOOT=%q\n' "$SECURE_BOOT"
+    } > "$CONFIG_FILE"
     chmod 600 "$CONFIG_FILE"
 }
 
@@ -139,17 +178,22 @@ load_configuration() {
         log_fatal "Config not found: $CONFIG_FILE"
         exit 1
     fi
+
+    # shellcheck source=/dev/null
     source "$CONFIG_FILE"
+
+    : "${SECURE_BOOT:=n}"
+    : "${GPU_TYPE:=none}"
+    : "${DESKTOP_ENV:=none}"
 }
 
 gather_user_configuration() {
     log_info "Gathering installation configuration..."
 
-    if [[ -f "$CONFIG_FILE" ]]; then
+    if [[ -s "$CONFIG_FILE" ]]; then
         prompt_value "Resume with existing configuration? (y/N): " resume "n"
         if [[ "$resume" =~ ^[Yy]$ ]]; then
             load_configuration
-            SECURE_BOOT="${SECURE_BOOT:-n}"
             log_success "Configuration loaded"
             return
         fi
@@ -201,6 +245,7 @@ gather_user_configuration() {
         if ! validate_luks_passphrase "$LUKS_PASS"; then
             continue
         fi
+
         prompt_secret "Confirm passphrase: " LUKS_PASS_CONFIRM
         if [[ "$LUKS_PASS" == "$LUKS_PASS_CONFIRM" ]]; then
             break
@@ -211,15 +256,25 @@ gather_user_configuration() {
     while true; do
         prompt_secret "Root password: " ROOT_PASS
         prompt_secret "Confirm root password: " ROOT_PASS_CONFIRM
-        [[ "$ROOT_PASS" == "$ROOT_PASS_CONFIRM" ]] && break
-        log_error "Passwords do not match."
+        if [[ "$ROOT_PASS" != "$ROOT_PASS_CONFIRM" ]]; then
+            log_error "Passwords do not match."
+            continue
+        fi
+        if validate_password_strength "$ROOT_PASS" 12; then
+            break
+        fi
     done
 
     while true; do
         prompt_secret "User password: " USER_PASS
         prompt_secret "Confirm user password: " USER_PASS_CONFIRM
-        [[ "$USER_PASS" == "$USER_PASS_CONFIRM" ]] && break
-        log_error "Passwords do not match."
+        if [[ "$USER_PASS" != "$USER_PASS_CONFIRM" ]]; then
+            log_error "Passwords do not match."
+            continue
+        fi
+        if validate_password_strength "$USER_PASS" 12; then
+            break
+        fi
     done
 
     echo ""
@@ -277,14 +332,15 @@ confirm_installation() {
     echo ""
     echo "WARNING: ALL DATA ON $DISK WILL BE PERMANENTLY ERASED!"
     echo ""
-    prompt_value "Type 'YES' in capital letters to proceed: " confirm ""
 
+    prompt_value "Type 'YES' in capital letters to proceed: " confirm ""
     if [[ "$confirm" != "YES" ]]; then
         log_warn "Installation cancelled by user."
         exit 0
     fi
 }
 
+# ---- Lifecycle ---------------------------------------------------------------
 finalize_installation() {
     log_info "Finalizing installation..."
     sync
@@ -294,7 +350,8 @@ finalize_installation() {
 }
 
 installation_complete() {
-    local duration=$(($(date +%s) - START_TIME))
+    local duration
+    duration=$(($(date +%s) - START_TIME))
 
     clear
     cat << 'EOF'
@@ -405,6 +462,7 @@ run_install() {
     installation_complete
 }
 
+# ---- CLI ---------------------------------------------------------------------
 show_logs() {
     echo "Install log: ${INSTALL_LOG}"
     echo "Verbose log: ${INSTALL_LOG_VERBOSE}"
@@ -419,7 +477,7 @@ Usage:
 
 Commands:
   run       Start a full install (default)
-  resume    Resume from an existing config file
+  resume    Resume from an existing config file (CONFIG_FILE must point to it)
   config    Collect and save configuration only
   validate  Run pre-flight checks only
   logs      Show log file locations
@@ -428,11 +486,24 @@ EOF
 }
 
 main() {
+    local command="${1:-run}"
+
+    case "$command" in
+        help|--help|-h)
+            usage
+            exit 0
+            ;;
+        logs)
+            show_logs
+            exit 0
+            ;;
+    esac
+
+    # Everything else is either interactive or assumes a console context.
     require_tty
     print_banner
     prompt_enter
 
-    local command=${1:-run}
     case "$command" in
         run)
             run_install
@@ -447,12 +518,6 @@ main() {
             ;;
         validate)
             run_preflight
-            ;;
-        logs)
-            show_logs
-            ;;
-        help|--help|-h)
-            usage
             ;;
         *)
             echo "Unknown command: $command" >&2
