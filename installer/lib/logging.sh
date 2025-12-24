@@ -23,8 +23,17 @@ export INSTALL_LOG_VERBOSE="${INSTALL_LOG_VERBOSE:-/tmp/logos-install-verbose.lo
 ################################################################################
 
 init_logging() {
-    # Create log files
-    touch "$INSTALL_LOG" "$INSTALL_LOG_VERBOSE"
+    # Create log files (with fallback if /tmp isn't writable)
+    if ! touch "$INSTALL_LOG" "$INSTALL_LOG_VERBOSE" 2>/dev/null; then
+        local fallback_dir="/root/logos-installer-logs"
+        mkdir -p "$fallback_dir" 2>/dev/null || true
+        INSTALL_LOG="${fallback_dir}/logos-install.log"
+        INSTALL_LOG_VERBOSE="${fallback_dir}/logos-install-verbose.log"
+        if ! touch "$INSTALL_LOG" "$INSTALL_LOG_VERBOSE" 2>/dev/null; then
+            INSTALL_LOG="/dev/null"
+            INSTALL_LOG_VERBOSE="/dev/null"
+        fi
+    fi
 
     # Log header
     {
@@ -33,7 +42,7 @@ init_logging() {
         echo "║                     Started: $(date '+%Y-%m-%d %H:%M:%S')                              ║"
         echo "╚══════════════════════════════════════════════════════════════════════════════╝"
         echo ""
-    } | tee -a "$INSTALL_LOG" "$INSTALL_LOG_VERBOSE" >/dev/null
+    } | tee -a "$INSTALL_LOG" "$INSTALL_LOG_VERBOSE" >/dev/null || true
 }
 
 ################################################################################
@@ -42,7 +51,7 @@ init_logging() {
 
 log_debug() {
     if [[ $CURRENT_LOG_LEVEL -le $LOG_LEVEL_DEBUG ]]; then
-        echo "[$(date '+%H:%M:%S')] [DEBUG] $*" | tee -a "$INSTALL_LOG_VERBOSE" >&2
+        echo "[$(date '+%H:%M:%S')] [DEBUG] $*" | tee -a "$INSTALL_LOG_VERBOSE" >&2 || true
     else
         echo "[$(date '+%H:%M:%S')] [DEBUG] $*" >> "$INSTALL_LOG_VERBOSE"
     fi
@@ -50,7 +59,7 @@ log_debug() {
 
 log_info() {
     if [[ $CURRENT_LOG_LEVEL -le $LOG_LEVEL_INFO ]]; then
-        echo -e "${BLUE}[$(date '+%H:%M:%S')]${NC} $*" | tee -a "$INSTALL_LOG" "$INSTALL_LOG_VERBOSE"
+        echo -e "${BLUE}[$(date '+%H:%M:%S')]${NC} $*" | tee -a "$INSTALL_LOG" "$INSTALL_LOG_VERBOSE" || true
     else
         echo "[$(date '+%H:%M:%S')] [INFO] $*" >> "$INSTALL_LOG" "$INSTALL_LOG_VERBOSE"
     fi
@@ -58,7 +67,7 @@ log_info() {
 
 log_warn() {
     if [[ $CURRENT_LOG_LEVEL -le $LOG_LEVEL_WARN ]]; then
-        echo -e "${YELLOW}[$(date '+%H:%M:%S')] [WARN]${NC} $*" | tee -a "$INSTALL_LOG" "$INSTALL_LOG_VERBOSE" >&2
+        echo -e "${YELLOW}[$(date '+%H:%M:%S')] [WARN]${NC} $*" | tee -a "$INSTALL_LOG" "$INSTALL_LOG_VERBOSE" >&2 || true
     else
         echo "[$(date '+%H:%M:%S')] [WARN] $*" >> "$INSTALL_LOG" "$INSTALL_LOG_VERBOSE"
     fi
@@ -66,29 +75,29 @@ log_warn() {
 
 log_error() {
     if [[ $CURRENT_LOG_LEVEL -le $LOG_LEVEL_ERROR ]]; then
-        echo -e "${RED}[$(date '+%H:%M:%S')] [ERROR]${NC} $*" | tee -a "$INSTALL_LOG" "$INSTALL_LOG_VERBOSE" >&2
+        echo -e "${RED}[$(date '+%H:%M:%S')] [ERROR]${NC} $*" | tee -a "$INSTALL_LOG" "$INSTALL_LOG_VERBOSE" >&2 || true
     else
         echo "[$(date '+%H:%M:%S')] [ERROR] $*" >> "$INSTALL_LOG" "$INSTALL_LOG_VERBOSE"
     fi
 }
 
 log_fatal() {
-    echo -e "${RED}[$(date '+%H:%M:%S')] [FATAL]${NC} $*" | tee -a "$INSTALL_LOG" "$INSTALL_LOG_VERBOSE" >&2
+    echo -e "${RED}[$(date '+%H:%M:%S')] [FATAL]${NC} $*" | tee -a "$INSTALL_LOG" "$INSTALL_LOG_VERBOSE" >&2 || true
 }
 
 log_success() {
-    echo -e "${GREEN}[$(date '+%H:%M:%S')] [✓]${NC} $*" | tee -a "$INSTALL_LOG" "$INSTALL_LOG_VERBOSE"
+    echo -e "${GREEN}[$(date '+%H:%M:%S')] [✓]${NC} $*" | tee -a "$INSTALL_LOG" "$INSTALL_LOG_VERBOSE" || true
 }
 
 log_step() {
     local step_num=$1
     local step_desc=$2
 
-    echo "" | tee -a "$INSTALL_LOG" "$INSTALL_LOG_VERBOSE"
-    echo -e "${GREEN}═══════════════════════════════════════════════════════════${NC}" | tee -a "$INSTALL_LOG" "$INSTALL_LOG_VERBOSE"
-    echo -e "${GREEN}Step $step_num: $step_desc${NC}" | tee -a "$INSTALL_LOG" "$INSTALL_LOG_VERBOSE"
-    echo -e "${GREEN}═══════════════════════════════════════════════════════════${NC}" | tee -a "$INSTALL_LOG" "$INSTALL_LOG_VERBOSE"
-    echo "" | tee -a "$INSTALL_LOG" "$INSTALL_LOG_VERBOSE"
+    echo "" | tee -a "$INSTALL_LOG" "$INSTALL_LOG_VERBOSE" || true
+    echo -e "${GREEN}═══════════════════════════════════════════════════════════${NC}" | tee -a "$INSTALL_LOG" "$INSTALL_LOG_VERBOSE" || true
+    echo -e "${GREEN}Step $step_num: $step_desc${NC}" | tee -a "$INSTALL_LOG" "$INSTALL_LOG_VERBOSE" || true
+    echo -e "${GREEN}═══════════════════════════════════════════════════════════${NC}" | tee -a "$INSTALL_LOG" "$INSTALL_LOG_VERBOSE" || true
+    echo "" | tee -a "$INSTALL_LOG" "$INSTALL_LOG_VERBOSE" || true
 }
 
 ################################################################################
@@ -173,7 +182,7 @@ log_summary() {
         echo ""
         echo "Completed:  $(date '+%Y-%m-%d %H:%M:%S')"
         echo ""
-    } | tee -a "$INSTALL_LOG" "$INSTALL_LOG_VERBOSE"
+    } | tee -a "$INSTALL_LOG" "$INSTALL_LOG_VERBOSE" || true
 }
 
 ################################################################################
@@ -205,3 +214,5 @@ log_system_info() {
 
     log_success "System information logged"
 }
+
+
