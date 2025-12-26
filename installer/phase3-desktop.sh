@@ -64,13 +64,15 @@ install_dev() {
 }
 
 install_security() {
-  install_pkgs wireshark-qt nmap tcpdump aircrack-ng john hashcat metasploit burpsuite
+  install_pkgs wireshark-qt nmap tcpdump aircrack-ng john hashcat
+  ensure_yay
+  runuser -u "${AUR_USER:-${SUDO_USER:-}}" -- yay -S --noconfirm metasploit burpsuite
 }
 
 install_radio() {
-  install_pkgs gqrx gnuradio sdrangel direwolf xastir fldigi
+  install_pkgs gqrx gnuradio direwolf xastir fldigi
   ensure_yay
-  runuser -u "${AUR_USER:-${SUDO_USER:-}}" -- yay -S --noconfirm chirp
+  runuser -u "${AUR_USER:-${SUDO_USER:-}}" -- yay -S --noconfirm sdrangel chirp
 }
 
 install_gaming() {
