@@ -1,4 +1,4 @@
-# LogOS archinstall installer-proto
+# LogOS archinstall installer-proto (Not Yet Validated)
 
 This folder contains a prototype archinstall custom profile + plugin that injects the
 Ringed City GRUB selector into the install process.
