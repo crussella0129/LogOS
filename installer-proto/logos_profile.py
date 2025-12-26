@@ -96,3 +96,4 @@ net.ipv6.conf.default.accept_redirects = 0
         sysctl_path = f"{install_session.target}/etc/sysctl.d/99-logos-hardening.conf"
         with open(sysctl_path, "w", encoding="utf-8") as handle:
             handle.write(hardening)
+

@@ -5,6 +5,7 @@ This plugin overrides the default GRUB configuration to install
 Ringed City triple-kernel boot profiles.
 """
 
+import glob
 from pathlib import Path
 import subprocess
 
@@ -235,7 +236,6 @@ def _get_btrfs_uuid(installation: Installer) -> str:
         return result.stdout.strip()
 
     for pattern in ["/dev/mapper/luks-*", "/dev/mapper/arch*"]:
-        import glob
         for dev in glob.glob(pattern):
             result = subprocess.run(
                 ["blkid", "-s", "UUID", "-o", "value", dev],
