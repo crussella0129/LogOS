@@ -73,13 +73,13 @@ trap cleanup EXIT
 if [[ "${RESUME}" -le 0 ]]; then
   phase 0 "Create Disk + Partition + LUKS2 + Btrfs"
 
-  # Create fresh qcow2
-  if [[ ! -f "${QCOW2}" ]]; then
-    log "Creating ${DISK_SIZE} qcow2 disk..."
-    qemu-img create -f qcow2 "${QCOW2}" "${DISK_SIZE}"
-  else
-    log "Using existing disk: ${QCOW2}"
+  # Create fresh qcow2 (always start clean for step 0)
+  if [[ -f "${QCOW2}" ]]; then
+    log "Removing old disk image..."
+    rm -f "${QCOW2}"
   fi
+  log "Creating ${DISK_SIZE} qcow2 disk..."
+  qemu-img create -f qcow2 "${QCOW2}" "${DISK_SIZE}"
 
   # Connect via NBD
   modprobe nbd max_part=8 2>/dev/null || true
@@ -306,6 +306,20 @@ eselect profile set default/linux/amd64/23.0/desktop/systemd 2>/dev/null || \
   warn "Could not set profile — using default"
 eselect profile show
 
+# Critical: update @world before installing new packages.
+# Stage3 glibc version may be masked in current portage tree,
+# which blocks ALL package installations. This resolves it.
+log "Updating @world (resolves stage3 → current portage mismatches)..."
+emerge --update --deep --newuse --with-bdeps=y @world 2>&1 | tail -30 || {
+  warn "@world update had issues — trying to continue"
+  # If glibc is specifically the problem, unmask it
+  if emerge --pretend @world 2>&1 | grep -q "masked.*glibc"; then
+    log "Unmasking glibc for stage3 compatibility..."
+    echo "sys-libs/glibc" >> /etc/portage/package.unmask
+    emerge --update --deep --newuse @world 2>&1 | tail -20 || warn "@world update failed even after unmask"
+  fi
+}
+
 log "Setting timezone and locale..."
 ln -sf /usr/share/zoneinfo/America/New_York /etc/localtime
 echo "en_US.UTF-8 UTF-8" > /etc/locale.gen
@@ -325,19 +339,29 @@ echo "root:REDACTED_ROOT_PASS-2026" | chpasswd
 # ── Kernel (distribution kernel — prebuilt preferred for speed) ────
 log "Installing distribution kernel + firmware..."
 # Try binary kernel first (much faster for VM testing), fall back to source
-if ! emerge --noreplace sys-kernel/gentoo-kernel-bin sys-kernel/linux-firmware 2>&1 | tail -20; then
+emerge --noreplace sys-kernel/linux-firmware 2>&1 | tail -10
+if emerge --noreplace sys-kernel/gentoo-kernel-bin 2>&1 | tail -20; then
+  log "Binary kernel installed successfully"
+else
   warn "gentoo-kernel-bin failed — falling back to source-compiled gentoo-kernel"
-  emerge --noreplace sys-kernel/gentoo-kernel sys-kernel/linux-firmware 2>&1 | tail -20
+  emerge --noreplace sys-kernel/gentoo-kernel 2>&1 | tail -20
 fi
 log "Kernel installed: $(ls /boot/vmlinuz-* 2>/dev/null | head -1 || echo 'none found')"
 
 # Verify kernel was actually installed
-if [[ ! -f /boot/vmlinuz-* ]]; then
+if ! ls /boot/vmlinuz-* &>/dev/null; then
   warn "Kernel not found in /boot — trying installkernel manually"
   KVER="$(ls /lib/modules/ 2>/dev/null | sort -V | tail -1)"
   if [[ -n "${KVER}" ]] && [[ -f "/usr/src/linux-${KVER}/.config" ]]; then
     cd "/usr/src/linux-${KVER}" && make install 2>&1 | tail -5
   fi
+fi
+
+# Final kernel check — abort if still missing
+if ! ls /boot/vmlinuz-* &>/dev/null; then
+  log "FATAL: No kernel in /boot after all attempts. Emerging packages may be masked."
+  log "Check: emerge --pretend sys-kernel/gentoo-kernel-bin"
+  exit 1
 fi
 
 # ── Crypttab (required by dracut for LUKS unlock) ────────────
@@ -365,7 +389,17 @@ fi
 
 # ── GRUB ──────────────────────────────────────────────────────
 log "Installing GRUB..."
-emerge --noreplace --quiet-build sys-boot/grub 2>&1 | tail -5
+emerge --noreplace --quiet-build sys-boot/grub 2>&1 | tail -10
+
+# Refresh PATH — GRUB installs to /usr/sbin which may not be in PATH
+export PATH="/usr/sbin:/sbin:${PATH}"
+
+if ! command -v grub-mkconfig &>/dev/null; then
+  log "FATAL: grub-mkconfig not found after emerge. GRUB installation failed."
+  log "Checking: $(which grub-mkconfig 2>&1 || echo 'not in PATH')"
+  log "PATH=${PATH}"
+  exit 1
+fi
 
 # Deploy GRUB config with real LUKS UUID
 cp /root/installer-gentoo/grub/grub-defaults /etc/default/grub
@@ -376,9 +410,9 @@ mkdir -p /etc/grub.d
 cp /root/installer-gentoo/grub/41_logos_profiles /etc/grub.d/41_logos_profiles
 chmod +x /etc/grub.d/41_logos_profiles
 
-# We skip grub-install here (needs real EFI vars, done via QEMU later)
-# Just generate the config
+# Generate the config (skip grub-install — needs real EFI vars, done by host later)
 log "Generating GRUB config..."
+mkdir -p /boot/grub
 grub-mkconfig -o /boot/grub/grub.cfg 2>&1 | tail -10
 
 # ── Networking + SSH ──────────────────────────────────────────
