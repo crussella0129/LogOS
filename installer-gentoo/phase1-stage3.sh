@@ -49,7 +49,7 @@ fi
 if [[ -z "${STAGE3_PATH}" ]]; then
   log "Fetching latest stage3 tarball URL"
   LATEST_URL="${STAGE3_MIRROR}/releases/amd64/autobuilds/latest-${STAGE3_FLAVOR}.txt"
-  STAGE3_RELATIVE="$(wget -qO- "${LATEST_URL}" | grep -v '^#' | head -1 | awk '{print $1}')"
+  STAGE3_RELATIVE="$(wget -qO- "${LATEST_URL}" | grep -v '^#' | grep '\.tar' | head -1 | awk '{print $1}')"
 
   if [[ -z "${STAGE3_RELATIVE}" ]]; then
     die "Failed to determine latest stage3 URL"

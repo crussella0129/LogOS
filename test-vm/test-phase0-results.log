@@ -1,0 +1,10 @@
+Phase 0 Test — 2026-02-07T22:01:28-05:00
+PASS: 36
+FAIL: 0
+CRYPT_UUID: 17b2f9b1-6ff1-474c-850c-e4166ee5d356
+BTRFS_UUID: 4da8e635-286f-4ca4-b7bb-40250c555eef
+BOOT_UUID: 93db2590-58b0-4e9e-843d-6e003b16c3f5
+EFI_UUID: C7AD-F71D
+Partitions: EFI(1GB FAT32) + Boot(4GB ext4) + Root(LUKS2->Btrfs)
+Subvolumes: @ @home @canon @mesh @snapshots @log
+Encryption: LUKS2 aes-xts-plain64 512-bit argon2id

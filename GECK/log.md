@@ -135,3 +135,43 @@ Created custom ebuilds in logos-overlay and evaluated Shannon.
 **Status:** CONTINUE — Ebuilds created. Remaining: QEMU/KVM testing (requires VM environment).
 
 ---
+
+## Entry #3 — 2026-02-07
+
+### Summary
+Phase 0 and Phase 1 tested against QEMU qcow2 disk via NBD. Two bugs found and fixed.
+
+### Test Results
+**Phase 0 — Partitioning, LUKS2, Btrfs: 36 PASS, 0 FAIL**
+- Verified: sgdisk 3-partition layout (EFI EF00, Boot 8300, Root 8309)
+- Verified: EFI FAT32, Boot ext4 formatting
+- Verified: LUKS2 creation (aes-xts-plain64, 512-bit, argon2id)
+- Verified: Btrfs with 6 subvolumes (@, @home, @canon, @mesh, @snapshots, @log)
+- Verified: Mount hierarchy (8 mountpoints), zstd:3 compression, nodatacow on @log
+- Verified: UUID capture (CRYPT, BTRFS, BOOT, EFI)
+
+**Phase 1 — Stage3 Bootstrap: 41 PASS, 0 FAIL**
+- Verified: Stage3 URL resolution from distfiles.gentoo.org
+- Verified: GPG signature verification
+- Verified: Stage3 extraction (257 MB, paths: emerge, bash, systemd)
+- Verified: Portage config deployment (make.conf, 3 package.use, accept_keywords, licenses)
+- Verified: make.conf content (CFLAGS, RUSTFLAGS, USE flags, GRUB_PLATFORMS, ccache)
+- Verified: fstab generation with real UUIDs and all subvolumes
+- Verified: Branding (logos-release with Gentoo base)
+- Verified: Directory structure (8 critical paths)
+
+### Bugs Found and Fixed
+1. **EFI mount order** (phase0-partition.sh): `mkdir boot/efi` was created BEFORE mounting boot partition, then overwritten by boot mount. Fixed: create efi dir AFTER mounting boot.
+2. **nodatacow** (phase0-partition.sh): `nodatacow` is a Btrfs per-inode attribute (chattr +C), NOT a mount option. It was silently ignored in findmnt output. Fixed: use `chattr +C` on /var/log after mount.
+3. **Stage3 URL parser** (phase1-stage3.sh): `latest-stage3-*.txt` contains `Hash:` lines that were matched by the grep. Fixed: filter for lines containing `.tar`.
+
+### Test Method
+- QEMU qcow2 disk connected via NBD (nbd kernel module)
+- Phase 0 logic tested directly on /dev/nbd0 (partitioning, LUKS, Btrfs)
+- Phase 1 logic tested by stage3 extraction into mounted filesystem
+- No full VM boot required — validates disk-level operations
+
+### Checkpoint
+**Status:** CONTINUE — Phase 0+1 verified. Remaining: Phase 2+ testing requires full QEMU boot.
+
+---

@@ -112,15 +112,17 @@ umount /mnt
 log "Mounting subvolumes"
 mount -o "subvol=@,${BTRFS_OPTS}" /dev/mapper/cryptroot /mnt
 
-mkdir -p /mnt/{home,srv/cold-canon,srv/warm-mesh,var/log,.snapshots,boot,boot/efi}
+mkdir -p /mnt/{home,srv/cold-canon,srv/warm-mesh,var/log,.snapshots,boot}
 
 mount -o "subvol=@home,${BTRFS_OPTS}"     /dev/mapper/cryptroot /mnt/home
 mount -o "subvol=@canon,${BTRFS_OPTS}"    /dev/mapper/cryptroot /mnt/srv/cold-canon
 mount -o "subvol=@mesh,${BTRFS_OPTS}"     /dev/mapper/cryptroot /mnt/srv/warm-mesh
 mount -o "subvol=@snapshots,${BTRFS_OPTS}" /dev/mapper/cryptroot /mnt/.snapshots
-mount -o "subvol=@log,nodatacow,${BTRFS_OPTS}" /dev/mapper/cryptroot /mnt/var/log
+mount -o "subvol=@log,${BTRFS_OPTS}" /dev/mapper/cryptroot /mnt/var/log
+chattr +C /mnt/var/log
 
 mount "${PART_BOOT}" /mnt/boot
+mkdir -p /mnt/boot/efi
 mount "${PART_EFI}"  /mnt/boot/efi
 
 # ── Save UUIDs ────────────────────────────────────────────────────

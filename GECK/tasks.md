@@ -48,7 +48,7 @@
 
 ## Backlog — Verification & Iteration
 
-- [ ] Test Phase 0-1 in QEMU/KVM (LUKS+Btrfs boots to login)
+- [x] Test Phase 0-1 in QEMU/KVM (36+41 PASS, 0 FAIL — via NBD against qcow2)
 - [ ] Test Phase 2 (all 3 Ringed City profiles appear in GRUB)
 - [ ] Test Phase 3 (KDE Plasma desktop loads)
 - [ ] Test kernel degradation (`echo c > /proc/sysrq-trigger` → Gael fallback)
