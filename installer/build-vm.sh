@@ -86,6 +86,19 @@ command -v qemu-system-x86_64 >/dev/null || die "qemu-system-x86_64 not found"
 
 mkdir -p "${WORK_DIR}" "${MNT}" "${LOG_DIR}" "${STAGE3_CACHE}"
 
+# Clean up leftovers from any previous failed build
+if [[ -e "/dev/mapper/${LUKS_NAME}" ]]; then
+    log "Closing stale LUKS mapping '${LUKS_NAME}' from previous run"
+    umount -l "${MNT}"/* 2>/dev/null || true
+    umount -l "${MNT}" 2>/dev/null || true
+    cryptsetup close "${LUKS_NAME}" 2>/dev/null || true
+fi
+# Detach any loop devices still pointing at our image
+for ld in $(losetup -j "${IMG_RAW}" 2>/dev/null | cut -d: -f1); do
+    log "Detaching stale loop device ${ld}"
+    losetup -d "${ld}" 2>/dev/null || true
+done
+
 # ---------------------------------------------------------------------------
 # STEP 1: Create raw disk image
 # ---------------------------------------------------------------------------
