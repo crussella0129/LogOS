@@ -322,10 +322,13 @@ useradd -m -G wheel,audio,video,usb -s /bin/bash logos 2>/dev/null || true
 echo "logos:logos" | chpasswd
 echo "root:REDACTED_ROOT_PASS-2026" | chpasswd
 
-# ── Kernel (distribution kernel — prebuilt, fast) ─────────────
+# ── Kernel (distribution kernel — prebuilt preferred for speed) ────
 log "Installing distribution kernel + firmware..."
-# Use gentoo-kernel (source-compiled) — gentoo-kernel-bin may have dep issues
-emerge --noreplace sys-kernel/gentoo-kernel sys-kernel/linux-firmware 2>&1 | tail -20
+# Try binary kernel first (much faster for VM testing), fall back to source
+if ! emerge --noreplace sys-kernel/gentoo-kernel-bin sys-kernel/linux-firmware 2>&1 | tail -20; then
+  warn "gentoo-kernel-bin failed — falling back to source-compiled gentoo-kernel"
+  emerge --noreplace sys-kernel/gentoo-kernel sys-kernel/linux-firmware 2>&1 | tail -20
+fi
 log "Kernel installed: $(ls /boot/vmlinuz-* 2>/dev/null | head -1 || echo 'none found')"
 
 # Verify kernel was actually installed
@@ -336,6 +339,13 @@ if [[ ! -f /boot/vmlinuz-* ]]; then
     cd "/usr/src/linux-${KVER}" && make install 2>&1 | tail -5
   fi
 fi
+
+# ── Crypttab (required by dracut for LUKS unlock) ────────────
+log "Generating /etc/crypttab..."
+cat > /etc/crypttab << CTEOF
+cryptroot UUID=${CRYPT_UUID} none luks,discard
+CTEOF
+log "  crypttab: cryptroot -> UUID=${CRYPT_UUID}"
 
 # ── Initramfs ─────────────────────────────────────────────────
 log "Installing dracut and generating initramfs..."

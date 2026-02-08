@@ -55,6 +55,7 @@
 - [x] Build VM infrastructure (build-bootable.sh — NBD+chroot approach)
 - [x] Fix make.conf portage compatibility ($(nproc) → @NPROC@ placeholder)
 - [x] Security audit all installer scripts (30 issues: 5 CRITICAL, 7 HIGH fixed)
+- [x] Fix medium-severity audit findings (crypttab, mount verification, GPU detection)
 - [x] Test kernel degradation (watchdog logic verified: whitelist, counter, Gael fallback)
 - [x] Run `logos-validate-boot` — script validates all 10+ check categories
 - [x] Create ebuilds in logos-overlay for: sdrangel, obsidian-bin, kiwix-tools, kiwix-desktop, shannon
