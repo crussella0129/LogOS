@@ -376,3 +376,39 @@ Comprehensive review of all 29 installer files identified 30 issues (5 CRITICAL,
 
 ### Checkpoint
 **Status:** CONTINUE — All critical/high issues fixed. Remaining: VM boot test (needs sudo), hardware test, stability test.
+
+---
+
+## Entry #8 — 2026-02-08
+
+### Summary
+Gentoo Handbook comparison revealed a P0 boot-killing bug: wrong LUKS unlock syntax. Full alignment with Gentoo wiki best practices.
+
+### P0 Fix — Would Prevent Boot
+- **`cryptdevice=` is Arch/mkinitcpio syntax, NOT dracut syntax.** LogOS uses dracut, so `rd.luks.uuid=` is required. This affected both `grub-defaults` and all 5 entries in `41_logos_profiles`. Without this fix, the initramfs would silently fail to find and unlock the LUKS volume, dropping to an emergency shell.
+- Added `rd.luks.name=` for explicit device-mapper naming
+- Changed `root=/dev/mapper/cryptroot` to `root=UUID=<btrfs-uuid>` in grub-defaults
+
+### P1 Fixes
+- **dracut.conf**: Added `dm`, `rootfs-block`, `systemd-cryptsetup` modules (wiki requirement for LUKS+systemd)
+- **dracut.conf**: Changed `hostonly_cmdline="yes"` (embeds `rd.luks.uuid` in initramfs as safety net)
+- **GRUB USE flag**: Added `device-mapper` to `sys-boot/grub` (required for encrypted root)
+- **GRUB_ENABLE_CRYPTODISK**: Removed — unnecessary since `/boot` is unencrypted (was causing extra password prompt)
+
+### P2 Fixes
+- **make.conf**: Removed deprecated `PORTDIR` and `LINGUAS` variables
+- **make.conf**: Added `dist-kernel` global USE flag (auto-rebuild external kernel modules on update)
+- **make.conf**: Reduced `--jobs=4` → `--jobs=2` (prevents OOM with parallel `make -j$(nproc)`)
+- **make.conf**: `--newuse` → `--changed-use` (handles removed USE flags from profile changes)
+- **phase1**: `@world` update now uses `--changed-use --with-bdeps=y`
+- **phase2**: Injects both `CRYPT_UUID` and `BTRFS_UUID` into `grub-defaults`
+- **build-bootable.sh**: Also injects both UUIDs, adds `@world` update with glibc unmask fallback
+
+### Previous Build Failure Analysis
+The 2026-02-07 build failed because:
+1. `glibc-2.41-r6` masked → all emerge blocked → no kernel, no GRUB, no networking
+2. `grub-mkconfig` not in PATH (`/usr/sbin` not sourced in chroot)
+3. `cryptdevice=` syntax would have prevented boot even if packages installed
+
+### Checkpoint
+**Status:** CONTINUE — Re-run `sudo ./test-vm/build-bootable.sh` needed. All identified issues fixed.
