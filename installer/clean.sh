@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # clean.sh — One-shot kill: wipe all build artifacts for a fresh installer run
 #
-# Force-kills any process holding our LUKS/loop devices, stops udisks
-# automounting, closes LUKS, detaches loops, removes build output.
+# Kills every process holding our devices, unmounts automounts, closes all
+# LUKS/dm mappings (current + legacy NBD-based names), disconnects NBD,
+# detaches loop devices, and removes build output.
 # Stage3 cache is preserved by default (use --all to remove it too).
 #
 # Usage: sudo ./installer/clean.sh [--all]
@@ -14,7 +15,9 @@ WORK_DIR="${SCRIPT_DIR}/build"
 IMG_RAW="${WORK_DIR}/logos-vm.raw"
 MNT="${WORK_DIR}/mnt"
 LOG_DIR="${SCRIPT_DIR}/logs"
-LUKS_NAME="cryptroot"
+
+# All dm names we have ever used (current losetup-based + old NBD-based)
+DM_NAMES=(cryptroot logos-build logos-build-crypt logos-build-new)
 
 log() { echo "[clean $(date +%H:%M:%S)] $*"; }
 
@@ -25,18 +28,40 @@ if [[ "${1:-}" == "--all" ]]; then
     WIPE_CACHE=true
 fi
 
-# ---- Kill udisks polling on our devices ----
-# Ubuntu's automounter (udisksd/nautilus) grabs loop partitions and LUKS
-# devices the moment they appear, preventing cryptsetup close. Kill any
-# udisks job targeting our devices before attempting cleanup.
+# ---- Helper: kill all processes holding a device ----
 kill_holders() {
     local dev="$1"
-    if [[ ! -e "${dev}" ]]; then return; fi
-    # fuser returns PIDs holding the device; -k sends SIGKILL
+    [[ -e "${dev}" ]] || return 0
     if fuser -k "${dev}" 2>/dev/null; then
         log "  Killed processes holding ${dev}"
         sleep 0.5
     fi
+}
+
+# ---- Helper: force-remove a dm mapping through escalating methods ----
+force_close_dm() {
+    local name="$1"
+    [[ -e "/dev/mapper/${name}" ]] || return 0
+
+    log "Closing dm mapping '${name}'"
+
+    # Kill holders and unmount anything mounted from this device
+    kill_holders "/dev/mapper/${name}"
+    for mp in $(findmnt -n -o TARGET -S "/dev/mapper/${name}" 2>/dev/null || true); do
+        log "  umount ${mp}"
+        umount -l "${mp}" 2>/dev/null || true
+    done
+
+    # Escalation ladder: cryptsetup → dmsetup --force → wipe_table → remove
+    cryptsetup close "${name}" 2>/dev/null && { log "  Closed (cryptsetup)"; return 0; }
+    dmsetup remove --force --retry "${name}" 2>/dev/null && { sleep 0.5; }
+    [[ -e "/dev/mapper/${name}" ]] || { log "  Closed (dmsetup)"; return 0; }
+    dmsetup wipe_table "${name}" 2>/dev/null || true
+    dmsetup remove --force "${name}" 2>/dev/null || true
+    sleep 0.5
+    [[ -e "/dev/mapper/${name}" ]] || { log "  Closed (wipe+remove)"; return 0; }
+
+    log "  WARNING: /dev/mapper/${name} persists — will retry after device detach"
 }
 
 # ---- Unmount everything under MNT ----
@@ -48,68 +73,40 @@ if mount | grep -q "${MNT}"; then
     done
 fi
 
-# ---- Unmount any automounted LUKS/loop partitions outside our tree ----
-# Ubuntu may automount the btrfs/ext4 partitions to /media/root/* or similar
-for dev_path in /dev/mapper/"${LUKS_NAME}" /dev/loop*p*; do
-    if [[ -e "${dev_path}" ]]; then
-        mp=$(findmnt -n -o TARGET "${dev_path}" 2>/dev/null || true)
-        if [[ -n "${mp}" ]]; then
-            log "Unmounting automounted ${dev_path} from ${mp}"
-            umount -l "${mp}" 2>/dev/null || true
-        fi
+# ---- Unmount any automounted partitions outside our tree ----
+# Ubuntu/Nautilus automounts loop partitions and LUKS to /media/root/* etc.
+for dev_path in /dev/mapper/cryptroot /dev/mapper/logos-build* /dev/loop*p* /dev/nbd0p*; do
+    [[ -e "${dev_path}" ]] || continue
+    mp=$(findmnt -n -o TARGET "${dev_path}" 2>/dev/null || true)
+    if [[ -n "${mp}" ]]; then
+        log "Unmounting automounted ${dev_path} from ${mp}"
+        kill_holders "${dev_path}"
+        umount -l "${mp}" 2>/dev/null || true
     fi
 done
 
-# ---- Close LUKS ----
-if [[ -e "/dev/mapper/${LUKS_NAME}" ]]; then
-    log "Closing LUKS mapping '${LUKS_NAME}'"
+# ---- Close all dm mappings (current + legacy) ----
+for dm in "${DM_NAMES[@]}"; do
+    force_close_dm "${dm}"
+done
 
-    # Kill anything holding the mapper device open (nautilus, udisksd, etc)
-    kill_holders "/dev/mapper/${LUKS_NAME}"
-
-    # Also kill holders of the underlying btrfs mount if still referenced
-    for mp in $(findmnt -n -o TARGET -S "/dev/mapper/${LUKS_NAME}" 2>/dev/null || true); do
-        umount -l "${mp}" 2>/dev/null || true
-    done
-
-    # Attempt 1: cryptsetup
-    if cryptsetup close "${LUKS_NAME}" 2>/dev/null; then
-        log "LUKS mapping closed (cryptsetup)"
-    else
-        # Attempt 2: dmsetup with --force and deferred removal
-        log "cryptsetup close failed, forcing with dmsetup"
-        dmsetup remove --force --retry "${LUKS_NAME}" 2>/dev/null || true
-        sleep 1
-
-        # Attempt 3: deactivate all children first, then parent
-        if [[ -e "/dev/mapper/${LUKS_NAME}" ]]; then
-            # Some dm devices stack; remove children
-            for child in $(dmsetup ls --tree 2>/dev/null | grep -A1 "${LUKS_NAME}" | grep -v "${LUKS_NAME}" | awk '{print $1}'); do
-                dmsetup remove --force "${child}" 2>/dev/null || true
-            done
-            dmsetup remove --force "${LUKS_NAME}" 2>/dev/null || true
-            sleep 1
-        fi
-
-        if [[ -e "/dev/mapper/${LUKS_NAME}" ]]; then
-            # Final attempt: wipe the dm table so the device becomes inert
-            dmsetup wipe_table "${LUKS_NAME}" 2>/dev/null || true
-            dmsetup remove --force "${LUKS_NAME}" 2>/dev/null || true
-            sleep 1
-        fi
+# ---- Disconnect NBD devices (legacy installer) ----
+for nbd in /dev/nbd[0-9]*; do
+    [[ -b "${nbd}" ]] || continue
+    # Skip if no partitions (not connected)
+    if lsblk -n -o SIZE "${nbd}" 2>/dev/null | grep -qv '0B'; then
+        log "Disconnecting NBD device ${nbd}"
+        for part in "${nbd}"p*; do
+            [[ -e "${part}" ]] && kill_holders "${part}"
+        done
+        kill_holders "${nbd}"
+        qemu-nbd --disconnect "${nbd}" 2>/dev/null || true
     fi
-
-    if [[ -e "/dev/mapper/${LUKS_NAME}" ]]; then
-        log "WARNING: /dev/mapper/${LUKS_NAME} still exists"
-        log "  Likely held by a kernel reference. Will detach loop device anyway."
-        log "  The dm entry will disappear once the loop device is gone."
-    fi
-fi
+done
 
 # ---- Detach loop devices pointing at our image ----
 if [[ -f "${IMG_RAW}" ]]; then
     for ld in $(losetup -j "${IMG_RAW}" 2>/dev/null | cut -d: -f1); do
-        # Kill anything holding loop partitions (automounter)
         for part in "${ld}"p*; do
             [[ -e "${part}" ]] && kill_holders "${part}"
         done
@@ -119,8 +116,8 @@ if [[ -f "${IMG_RAW}" ]]; then
     done
 fi
 
-# ---- Also detach any orphaned loops (image deleted but loop still attached) ----
-for ld in $(losetup -l -n -O NAME,BACK-FILE 2>/dev/null | grep "logos-vm.raw" | awk '{print $1}'); do
+# ---- Detach any orphaned loops (image deleted but loop still attached) ----
+for ld in $(losetup -l -n -O NAME,BACK-FILE 2>/dev/null | grep "logos-vm" | awk '{print $1}'); do
     for part in "${ld}"p*; do
         [[ -e "${part}" ]] && kill_holders "${part}"
     done
@@ -129,22 +126,25 @@ for ld in $(losetup -l -n -O NAME,BACK-FILE 2>/dev/null | grep "logos-vm.raw" | 
     losetup -d "${ld}" 2>/dev/null || true
 done
 
-# ---- Final dm cleanup: catch any stale cryptroot after loop detach ----
-if [[ -e "/dev/mapper/${LUKS_NAME}" ]]; then
-    sleep 1
-    dmsetup remove --force "${LUKS_NAME}" 2>/dev/null || true
-    if [[ -e "/dev/mapper/${LUKS_NAME}" ]]; then
-        log "ERROR: /dev/mapper/${LUKS_NAME} is stuck. Reboot required."
-    else
-        log "Stale dm entry cleared after loop detach"
+# ---- Final sweep: retry any dm mappings that persisted ----
+any_stuck=false
+for dm in "${DM_NAMES[@]}"; do
+    if [[ -e "/dev/mapper/${dm}" ]]; then
+        sleep 1
+        dmsetup remove --force "${dm}" 2>/dev/null || true
+        if [[ -e "/dev/mapper/${dm}" ]]; then
+            log "ERROR: /dev/mapper/${dm} is stuck. Reboot required."
+            any_stuck=true
+        else
+            log "Stale dm entry '${dm}' cleared after device detach"
+        fi
     fi
-fi
+done
 
 # ---- Remove build artifacts ----
 if [[ -d "${WORK_DIR}" ]]; then
     log "Removing build artifacts"
 
-    # Images
     for f in "${WORK_DIR}"/logos-vm.raw "${WORK_DIR}"/logos-vm.qcow2; do
         if [[ -f "${f}" ]]; then
             log "  rm ${f} ($(du -sh "${f}" | cut -f1))"
@@ -152,19 +152,16 @@ if [[ -d "${WORK_DIR}" ]]; then
         fi
     done
 
-    # Mount tree
     if [[ -d "${MNT}" ]]; then
         log "  rm -rf ${MNT}"
         rm -rf "${MNT}"
     fi
 
-    # Stage3 cache
     if [[ "${WIPE_CACHE}" == true ]] && [[ -d "${WORK_DIR}/stage3-cache" ]]; then
         log "  rm -rf stage3-cache ($(du -sh "${WORK_DIR}/stage3-cache" | cut -f1))"
         rm -rf "${WORK_DIR}/stage3-cache"
     fi
 
-    # Remove build dir if empty (or only stage3-cache remains)
     rmdir "${WORK_DIR}" 2>/dev/null || true
 fi
 
@@ -174,7 +171,17 @@ if [[ -d "${LOG_DIR}" ]]; then
     rm -rf "${LOG_DIR}"
 fi
 
-log "Clean complete."
+# ---- Also clean test-vm/ debris if present ----
+if [[ -d "${SCRIPT_DIR}/../test-vm" ]]; then
+    log "Removing legacy test-vm/"
+    rm -rf "${SCRIPT_DIR}/../test-vm"
+fi
+
+if [[ "${any_stuck}" == true ]]; then
+    log "Clean finished with warnings — reboot to clear stuck dm entries."
+else
+    log "Clean complete."
+fi
 if [[ "${WIPE_CACHE}" == false ]] && [[ -d "${WORK_DIR}/stage3-cache" ]]; then
     log "Stage3 cache preserved ($(du -sh "${WORK_DIR}/stage3-cache" | cut -f1)). Use --all to remove."
 fi
