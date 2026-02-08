@@ -63,6 +63,9 @@ cleanup() {
   cryptsetup close logos-build 2>/dev/null || true
   sleep 1
   qemu-nbd --disconnect "${NBD_DEV}" 2>/dev/null || true
+  # Remove temporary udev rule
+  rm -f /run/udev/rules.d/99-logos-build-ignore.rules
+  udevadm control --reload-rules 2>/dev/null || true
   log "Cleanup done"
 }
 trap cleanup EXIT
@@ -88,6 +91,19 @@ if [[ "${RESUME}" -le 0 ]]; then
   qemu-nbd --connect="${NBD_DEV}" "${QCOW2}"
   sleep 2
 
+  # Disable Ubuntu automounter for NBD devices (prevents "device busy" on partitions)
+  log "Disabling automount for NBD partitions..."
+  for i in 1 2 3; do
+    udevadm info --query=property "${NBD_DEV}p${i}" 2>/dev/null && \
+      udevadm trigger --action=remove "${NBD_DEV}p${i}" 2>/dev/null || true
+  done
+  # Tell udisks to ignore this device
+  mkdir -p /run/udev/rules.d
+  cat > /run/udev/rules.d/99-logos-build-ignore.rules << 'UDEVRULE'
+KERNEL=="nbd0*", ENV{UDISKS_IGNORE}="1", ENV{UDISKS_AUTO}="0"
+UDEVRULE
+  udevadm control --reload-rules 2>/dev/null || true
+
   # Partition — use separate sgdisk calls (more reliable with NBD)
   log "Partitioning disk..."
   sgdisk --zap-all "${NBD_DEV}" >/dev/null 2>&1 || true
@@ -96,6 +112,7 @@ if [[ "${RESUME}" -le 0 ]]; then
   sgdisk --new=2:0:+4G --typecode=2:8300 --change-name=2:"Boot" "${NBD_DEV}" >/dev/null 2>&1 || true
   sgdisk --new=3:0:0   --typecode=3:8309 --change-name=3:"Root" "${NBD_DEV}" >/dev/null 2>&1 || true
   partprobe "${NBD_DEV}" 2>/dev/null || true
+  udevadm settle --timeout=5 2>/dev/null || true
   sleep 3
 
   # Verify partitions were created
@@ -103,6 +120,11 @@ if [[ "${RESUME}" -le 0 ]]; then
     die "Partition creation failed — block devices not found"
   fi
   log "Partitions created: $(lsblk -no NAME "${NBD_DEV}" | tr '\n' ' ')"
+
+  # Ensure no automounter has grabbed the partitions
+  umount "${NBD_DEV}p1" 2>/dev/null || true
+  umount "${NBD_DEV}p2" 2>/dev/null || true
+  umount "${NBD_DEV}p3" 2>/dev/null || true
 
   # LUKS2
   log "Creating LUKS2 volume..."
