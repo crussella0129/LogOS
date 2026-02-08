@@ -1,0 +1,14 @@
+# LogOS Gentoo — /etc/default/grub
+# GRUB configuration for Ringed City multi-kernel boot
+
+GRUB_DEFAULT=saved
+GRUB_SAVEDEFAULT=true
+GRUB_TIMEOUT=10
+GRUB_DISTRIBUTOR="LogOS"
+GRUB_CMDLINE_LINUX_DEFAULT=""
+GRUB_CMDLINE_LINUX="cryptdevice=UUID=@CRYPT_UUID@:cryptroot root=/dev/mapper/cryptroot rootflags=subvol=@"
+GRUB_ENABLE_CRYPTODISK=y
+GRUB_DISABLE_OS_PROBER=false
+GRUB_GFXMODE=auto
+GRUB_GFXPAYLOAD_LINUX=keep
+GRUB_TERMINAL_OUTPUT=gfxterm

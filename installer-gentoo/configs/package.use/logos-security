@@ -1,0 +1,28 @@
+# LogOS Gentoo — Security package USE flags
+
+# AppArmor — enable everywhere relevant
+sys-apps/systemd apparmor
+sys-libs/libapparmor python
+sys-apps/apparmor-utils python
+
+# Audit framework
+sys-process/audit python
+
+# Cryptography — LUKS2 + Argon2
+sys-fs/cryptsetup argon2 luks2 udev
+
+# PAM integration
+sys-auth/pambase apparmor audit
+
+# OpenSSH hardening
+net-misc/openssh security-key
+
+# Firewall
+net-firewall/ufw iptables
+
+# GnuPG
+app-crypt/gnupg usb smartcard
+
+# Kernel security modules
+sys-kernel/gentoo-kernel savedconfig
+sys-kernel/installkernel dracut grub

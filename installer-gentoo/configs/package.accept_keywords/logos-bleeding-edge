@@ -1,0 +1,30 @@
+# LogOS Gentoo — Accept ~amd64 for select packages
+
+# Zen kernel sources (often ~amd64)
+sys-kernel/zen-sources ~amd64
+
+# Hardened kernel sources
+sys-kernel/hardened-sources ~amd64
+
+# Rust tools (latest versions)
+sys-apps/ripgrep ~amd64
+sys-apps/fd ~amd64
+sys-apps/bat ~amd64
+app-misc/eza ~amd64
+sys-process/bottom ~amd64
+app-shells/starship ~amd64
+dev-util/tokei ~amd64
+sys-apps/dust ~amd64
+app-shells/zoxide ~amd64
+net-analyzer/bandwhich ~amd64
+sys-process/procs ~amd64
+
+# Security tools
+net-analyzer/fail2ban ~amd64
+
+# KDE Plasma (latest)
+kde-plasma/plasma-meta ~amd64
+
+# SDR tools
+net-wireless/gnuradio ~amd64
+net-wireless/gqrx ~amd64

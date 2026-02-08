@@ -1,0 +1,18 @@
+[Unit]
+Description=LogOS Kernel Boot Health Watchdog
+Documentation=man:logos-watchdog
+After=network-online.target apparmor.service auditd.service ufw.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/logos/kernel-watchdog.sh
+StandardOutput=journal
+StandardError=journal
+
+# Security hardening for the watchdog itself
+ProtectSystem=strict
+ReadWritePaths=/var/lib/logos-watchdog /boot/grub
+ProtectHome=yes
+NoNewPrivileges=no
+PrivateTmp=yes

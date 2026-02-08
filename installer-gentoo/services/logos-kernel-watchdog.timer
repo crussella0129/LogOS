@@ -1,0 +1,12 @@
+[Unit]
+Description=LogOS Kernel Boot Health Watchdog Timer
+Documentation=man:logos-watchdog
+
+[Timer]
+# Run 90 seconds after boot to allow all services to stabilize
+OnBootSec=90s
+# Only run once per boot
+Persistent=false
+
+[Install]
+WantedBy=timers.target

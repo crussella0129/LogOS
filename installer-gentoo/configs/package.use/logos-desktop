@@ -1,0 +1,26 @@
+# LogOS Gentoo — Desktop package USE flags
+
+# KDE Plasma
+kde-plasma/plasma-meta bluetooth networkmanager sddm wallpapers
+kde-frameworks/kconfig qml
+kde-apps/kde-apps-meta -games
+
+# Display manager
+x11-misc/sddm wayland
+
+# Firefox
+www-client/firefox hwaccel screencast wayland
+
+# PipeWire audio
+media-video/pipewire bluetooth sound-server
+media-sound/pulseaudio -daemon
+
+# Mesa / GPU
+media-libs/mesa vulkan wayland
+x11-drivers/nvidia-drivers modules
+
+# Wayland
+dev-libs/wayland abi_x86_64
+
+# Qt6
+dev-qt/qtbase gui widgets network dbus opengl sql
