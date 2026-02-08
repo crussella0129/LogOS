@@ -319,39 +319,36 @@ log "Running emerge --sync"
 emerge --sync || true   # may fail on first run, non-fatal
 
 # ---- Handle glibc masking ----
+# The stage3 may ship a glibc version that's since been masked in the repo.
+# Unmask it so @world and kernel installs don't fail.
 log "Checking for masked glibc"
-if ! emerge --pretend --oneshot sys-libs/glibc >/dev/null 2>&1; then
-    log "glibc masked — unmasking"
-    mkdir -p /etc/portage/package.unmask
-    # Find what version is available and unmask it
-    GLIBC_ATOM="$(emerge --search sys-libs/glibc 2>/dev/null | grep -oP 'sys-libs/glibc-[\d.]+(-r\d+)?' | head -1 || echo 'sys-libs/glibc')"
-    echo "~${GLIBC_ATOM} amd64" > /etc/portage/package.unmask/glibc 2>/dev/null || true
-    # Also try accept_keywords approach
-    mkdir -p /etc/portage/package.accept_keywords
-    echo "sys-libs/glibc ~amd64" > /etc/portage/package.accept_keywords/glibc
-    log "glibc unmasked"
+INSTALLED_GLIBC="$(qatom -F '%{CATEGORY}/%{PN}-%{PV}' "$(portageq best_version / sys-libs/glibc)" 2>/dev/null || true)"
+if [[ -n "${INSTALLED_GLIBC}" ]]; then
+    if ! emerge --pretend --oneshot sys-libs/glibc >/dev/null 2>&1; then
+        log "glibc ${INSTALLED_GLIBC} is masked — unmasking"
+        mkdir -p /etc/portage/package.unmask
+        echo "${INSTALLED_GLIBC}" > /etc/portage/package.unmask/glibc
+        log "glibc unmasked"
+    fi
 fi
 
 # ---- Set profile ----
+# Phase A: plain systemd profile (no desktop — avoids pulling in GTK/Qt/KDE/GNOME)
 log "Setting profile"
-PROFILE="$(eselect profile list | grep 'default/linux/amd64/23.0/desktop/systemd' | grep -oP '\[(\d+)\]' | head -1 | tr -d '[]')"
+PROFILE="$(eselect profile list | grep -P 'default/linux/amd64/23\.0/systemd\b' | grep -v 'desktop\|merged-usr' | grep -oP '\[\d+\]' | head -1 | tr -d '[]')"
 if [[ -n "${PROFILE}" ]]; then
     eselect profile set "${PROFILE}"
-    log "Profile set to default/linux/amd64/23.0/desktop/systemd"
+    log "Profile set to default/linux/amd64/23.0/systemd"
 else
-    # Fallback — try systemd without desktop
-    PROFILE="$(eselect profile list | grep 'default/linux/amd64/23.0/systemd' | grep -v 'desktop' | grep -oP '\[(\d+)\]' | head -1 | tr -d '[]')"
-    [[ -n "${PROFILE}" ]] || die "Cannot find systemd profile"
-    eselect profile set "${PROFILE}"
-    log "Profile set to default/linux/amd64/23.0/systemd (no desktop variant found)"
+    die "Cannot find systemd profile"
 fi
 
 # ---- @world update ----
 log "Updating @world"
-emerge --update --deep --newuse --with-bdeps=y @world || {
+emerge --update --deep --changed-use --with-bdeps=y @world || {
     log "World update failed — trying with --backtrack=50"
-    emerge --update --deep --newuse --with-bdeps=y --backtrack=50 @world || {
-        log "WARNING: @world update failed, continuing anyway"
+    emerge --update --deep --changed-use --with-bdeps=y --backtrack=50 @world || {
+        log "WARNING: @world update failed, continuing with package installs"
     }
 }
 

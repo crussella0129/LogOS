@@ -12,3 +12,7 @@ sys-boot/grub device-mapper
 
 # cryptsetup: argon2 KDF (safe because /boot is unencrypted, GRUB never touches LUKS)
 sys-fs/cryptsetup argon2
+
+# Break circular dependency: libwebp <-> tiff (known Gentoo bootstrap issue)
+# After initial install, remove this line and re-emerge both with full USE.
+media-libs/tiff -webp
