@@ -23,26 +23,59 @@ CHROOT_LOG="${LOG_DIR}/chroot.log"
 DISK_SIZE="30G"
 LUKS_NAME="cryptroot"
 HOSTNAME="logos"
-USER_NAME="logos"
 
-# Credentials — NEVER hardcode. Read from env or prompt at runtime.
+# ---------------------------------------------------------------------------
+# Interactive setup — username and passwords with confirmation
+# ---------------------------------------------------------------------------
+confirm_password() {
+    local label="$1" varname="$2" pass1 pass2
+    while true; do
+        read -rsp "Enter ${label}: " pass1; echo
+        [[ -n "${pass1}" ]] || { echo "  Cannot be empty. Try again."; continue; }
+        read -rsp "Confirm ${label}: " pass2; echo
+        if [[ "${pass1}" == "${pass2}" ]]; then
+            eval "${varname}=\${pass1}"
+            return
+        fi
+        echo "  Passwords do not match. Try again."
+    done
+}
+
+# Username
+if [[ -n "${LOGOS_USER_NAME:-}" ]]; then
+    USER_NAME="${LOGOS_USER_NAME}"
+else
+    read -rp "Enter username for the VM [logos]: " USER_NAME
+    USER_NAME="${USER_NAME:-logos}"
+    # Validate: lowercase, starts with letter, no spaces
+    if [[ ! "${USER_NAME}" =~ ^[a-z][a-z0-9_-]*$ ]]; then
+        die "Invalid username '${USER_NAME}' — must be lowercase, start with a letter, no spaces"
+    fi
+fi
+
+# LUKS passphrase — a typo here bricks the entire build
 if [[ -n "${LOGOS_LUKS_PASS:-}" ]]; then
     LUKS_PASS="${LOGOS_LUKS_PASS}"
 else
-    read -rsp "Enter LUKS passphrase for VM: " LUKS_PASS; echo
-    [[ -n "${LUKS_PASS}" ]] || die "LUKS passphrase cannot be empty"
+    echo ""
+    echo "  IMPORTANT: If you mistype the LUKS passphrase, the disk will be"
+    echo "  permanently unrecoverable. You will be asked to type it twice."
+    echo ""
+    confirm_password "LUKS passphrase" LUKS_PASS
 fi
+
+# Root password
 if [[ -n "${LOGOS_ROOT_PASS:-}" ]]; then
     ROOT_PASS="${LOGOS_ROOT_PASS}"
 else
-    read -rsp "Enter root password for VM: " ROOT_PASS; echo
-    [[ -n "${ROOT_PASS}" ]] || die "Root password cannot be empty"
+    confirm_password "root password" ROOT_PASS
 fi
+
+# User password
 if [[ -n "${LOGOS_USER_PASS:-}" ]]; then
     USER_PASS="${LOGOS_USER_PASS}"
 else
-    read -rsp "Enter password for user '${USER_NAME}': " USER_PASS; echo
-    [[ -n "${USER_PASS}" ]] || die "User password cannot be empty"
+    confirm_password "password for user '${USER_NAME}'" USER_PASS
 fi
 STAGE3_CACHE="${WORK_DIR}/stage3-cache"
 STAGE3_MIRROR="https://distfiles.gentoo.org/releases/amd64/autobuilds"
