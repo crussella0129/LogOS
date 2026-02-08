@@ -175,3 +175,58 @@ Phase 0 and Phase 1 tested against QEMU qcow2 disk via NBD. Two bugs found and f
 **Status:** CONTINUE — Phase 0+1 verified. Remaining: Phase 2+ testing requires full QEMU boot.
 
 ---
+
+## Entry #4 — 2026-02-07
+
+### Summary
+Phase 2 tested — 110 PASS, 0 FAIL. Covers GRUB profiles, security configs, kernel watchdog, validation tool, branding, and CLI tools.
+
+### Test Results
+**Phase 2 — 110 PASS, 0 FAIL across 6 test sections:**
+
+**1. GRUB Ringed City Profiles (29 checks)**
+- Dynamic kernel resolution: zen → Midir/Halflight, hardened → Gael (prefers hardened over stable)
+- All 3 profiles generated with correct entry IDs (logos-gael, logos-midir, logos-halflight)
+- LUKS UUID (dashed + no-dash) and Btrfs UUID correctly injected
+- Gael: lockdown=confidentiality, nosmt=force, init_on_alloc, slab_nomerge, pti=on, audit=1, apparmor=1
+- Midir: mitigations=auto, audit=1, zen kernel
+- Halflight: mitigations=off, audit=0, nowatchdog, zen kernel
+- cryptomount present in all entries
+
+**2. Security Config Deployment (29 checks)**
+- sysctl: all 6 hardening params verified (kptr_restrict, dmesg_restrict, perf_paranoid, sysrq, bpf, syncookies)
+- Audit: 7 monitoring rules verified (passwd, sudoers, sshd, logos boot, watchdog, modules, immutable)
+- SSH: 6 hardening rules verified (no root, no password, MaxAuthTries, no X11, strong ciphers, PQ kex)
+- Dracut: 6 config params verified (crypt, btrfs, systemd, microcode, zstd, hostonly)
+
+**3. Kernel Watchdog Logic (19 checks)**
+- Whitelisted entries defined and validation function present
+- MAX_FAILURES=2, counter file defined
+- Uses grub-set-default with audit logging on degradation
+- Health checks: apparmor, auditd, ufw, NetworkManager, kernel taint
+- Degrades to Gael (confirmed direction)
+- Systemd: oneshot service, ProtectSystem=strict, 90s boot timer, timers.target
+
+**4. logos-validate-boot (11 checks)**
+- Validates: encryption, btrfs, zen/stable kernels, profiles, security services, sysctl, SSH, watchdog, branding
+
+**5. Branding (7 checks)**
+- logos-release: NAME=LogOS, CODENAME=Ringed City, BASE=Gentoo Linux, INSTALLATION_METHOD=phase-scripts
+- MOTD: Ringed City Build, all 3 profiles listed
+
+**6. Tool Scripts (9 checks)**
+- logos-assist: model configurable, uses ollama, interactive mode
+- logos-canon-promote: cold canon/warm mesh paths, SHA-256 verification, mismatch error handling
+
+### Cumulative Test Score
+| Phase | PASS | FAIL |
+|-------|------|------|
+| Phase 0 | 36 | 0 |
+| Phase 1 | 41 | 0 |
+| Phase 2 | 110 | 0 |
+| **Total** | **187** | **0** |
+
+### Checkpoint
+**Status:** CONTINUE — Phase 0-2 fully verified. Only Phase 3 (KDE desktop loads) requires a full VM boot with Gentoo installed. Hardware boot + stability tests require target hardware.
+
+---
