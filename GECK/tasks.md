@@ -53,8 +53,8 @@
 - [ ] Test Phase 3 (KDE Plasma desktop loads)
 - [ ] Test kernel degradation (`echo c > /proc/sysrq-trigger` → Gael fallback)
 - [ ] Run `logos-validate-boot` — all checks pass
-- [ ] Create ebuilds in logos-overlay for: sdrangel, obsidian, kiwix, shannon
-- [ ] Evaluate Shannon (agentic network tool from GitHub)
+- [x] Create ebuilds in logos-overlay for: sdrangel, obsidian-bin, kiwix-tools, kiwix-desktop, shannon
+- [x] Evaluate Shannon (KeygraphHQ/shannon — autonomous AI pentester, TypeScript/Docker, AGPL-3.0)
 - [ ] Kernel boots successfully on target hardware
 - [ ] System remains stable under load
 

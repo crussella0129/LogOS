@@ -43,10 +43,9 @@ fi
 # ── Kiwix (Offline Documentation) ────────────────────────────────
 if [[ "${INSTALL_KIWIX:-0}" == "1" ]]; then
   log "Installing Kiwix"
-  emerge_pkgs app-misc/kiwix-tools 2>/dev/null || {
-    warn "kiwix-tools not in tree — installing from logos-overlay"
-    install_logos_overlay 2>/dev/null || warn "logos-overlay not available"
-    emerge_pkgs app-misc/kiwix-tools 2>/dev/null || warn "Kiwix install failed — create ebuild"
+  install_logos_overlay
+  emerge_pkgs app-misc/kiwix-tools app-misc/kiwix-desktop 2>/dev/null || {
+    warn "kiwix packages not available — check logos-overlay and libkiwix/libzim deps"
   }
 fi
 

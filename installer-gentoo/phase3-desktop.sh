@@ -81,7 +81,9 @@ if [[ "${INSTALL_OFFICE:-0}" == "1" ]]; then
               mail-client/thunderbird \
               www-client/firefox \
               www-client/chromium
-  # Obsidian and Zotero — may need overlay
+  # Obsidian — from logos-overlay (binary package)
+  install_logos_overlay
+  emerge_pkgs app-misc/obsidian-bin 2>/dev/null || warn "obsidian-bin: install logos-overlay first"
   emerge_pkgs app-text/zotero 2>/dev/null || warn "zotero not in tree — add to logos-overlay"
 fi
 
@@ -121,6 +123,10 @@ if [[ "${INSTALL_SECURITY:-0}" == "1" ]]; then
   ensure_eselect_repository
   add_overlay pentoo "https://github.com/pentoo/pentoo-overlay.git"
   emerge_pkgs net-analyzer/metasploit 2>/dev/null || warn "metasploit: enable pentoo overlay"
+
+  # Shannon — autonomous AI pentester (Docker-based, from logos-overlay)
+  install_logos_overlay
+  emerge_pkgs net-analyzer/shannon 2>/dev/null || warn "shannon: install logos-overlay first"
 fi
 
 if [[ "${INSTALL_RADIO:-0}" == "1" ]]; then
@@ -162,7 +168,9 @@ if [[ "${INSTALL_SDR:-0}" == "1" ]]; then
               net-wireless/rtl-sdr \
               net-wireless/hackrf-tools \
               net-wireless/soapysdr
-  emerge_pkgs net-wireless/sdrangel 2>/dev/null || warn "sdrangel not in tree — add to logos-overlay"
+  # SDRangel — from logos-overlay
+  install_logos_overlay
+  emerge_pkgs net-wireless/sdrangel 2>/dev/null || warn "sdrangel: install logos-overlay first"
 fi
 
 if [[ "${INSTALL_SPECTRAL:-0}" == "1" ]]; then

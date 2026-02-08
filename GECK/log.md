@@ -106,3 +106,32 @@ installer-gentoo/
 **Status:** CONTINUE — All installer scripts written. Next: QEMU/KVM testing.
 
 ---
+
+## Entry #2 — 2026-02-07
+
+### Summary
+Created custom ebuilds in logos-overlay and evaluated Shannon.
+
+### Work Done
+**Shannon Evaluation:**
+- Identified as KeygraphHQ/shannon — autonomous AI pentester, ~10K GitHub stars
+- TypeScript/Docker/Temporal app requiring Anthropic API key
+- 96% success rate on XBOW benchmark (five-phase pipeline: recon → vuln analysis → exploitation → reporting)
+- NOT Rust (TypeScript) — packaged as thin Docker wrapper ebuild at `net-analyzer/shannon`
+- AGPL-3.0 license (Lite), commercial Pro variant exists
+
+**Custom Ebuilds Created (5):**
+- `net-wireless/sdrangel-7.23.1` — CMake build, Qt5, extensive USE flags for SDR hardware (airspy/bladerf/hackrf/limesuite/plutosdr/rtlsdr/soapy/uhd)
+- `app-misc/obsidian-bin-1.11.7` — Binary Electron package, installs to /opt/obsidian with desktop entry
+- `app-misc/kiwix-tools-3.8.1` — Meson build, depends on libkiwix>=14.1.0 + libzim>=9.0.0
+- `app-misc/kiwix-desktop-2.5.1` — QMake build, Qt5 + WebEngine, same libkiwix/libzim deps
+- `net-analyzer/shannon-0.1.0` — Docker wrapper ebuild with launcher script, requires ANTHROPIC_API_KEY
+
+**Phase Script Updates:**
+- phase3-desktop.sh: INSTALL_OFFICE now installs obsidian-bin from overlay; INSTALL_SECURITY installs shannon; INSTALL_SDR installs sdrangel from overlay
+- phase4-knowledge.sh: INSTALL_KIWIX installs both kiwix-tools and kiwix-desktop from overlay
+
+### Checkpoint
+**Status:** CONTINUE — Ebuilds created. Remaining: QEMU/KVM testing (requires VM environment).
+
+---
