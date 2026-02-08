@@ -405,6 +405,13 @@ cp /tmp/dracut-logos.conf /etc/dracut.conf.d/logos.conf
 mkdir -p /etc/default
 cp /tmp/grub-default /etc/default/grub
 
+# ---- Install dracut prerequisites ----
+# btrfs-progs and cryptsetup MUST be installed before the kernel.
+# The kernel postinst runs dracut, and dracut needs the 'btrfs' and
+# 'cryptsetup' commands to include those modules in the initramfs.
+log "Installing dracut prerequisites (btrfs-progs, cryptsetup)"
+emerge sys-fs/btrfs-progs sys-fs/cryptsetup || die "btrfs-progs/cryptsetup install failed"
+
 # ---- Install kernel ----
 log "Installing linux-firmware"
 emerge sys-kernel/linux-firmware || die "linux-firmware install failed"
