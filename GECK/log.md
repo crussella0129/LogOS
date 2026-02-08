@@ -349,3 +349,30 @@ VM build infrastructure created. Fixed portage make.conf compatibility bug. NBD+
 
 ### Checkpoint
 **Status:** CONTINUE — Build script ready, needs sudo to run full VM build. Remaining: execute build, boot test, hardware test.
+
+---
+
+## Entry #7 — 2026-02-07
+
+### Summary
+Security audit of all installer scripts. 5 critical, 7 high-severity issues found and fixed.
+
+### Audit Results
+Comprehensive review of all 29 installer files identified 30 issues (5 CRITICAL, 7 HIGH, 9 MEDIUM, 9 LOW).
+
+### Critical Fixes Applied
+1. **fstab REPLACE_ME fallback** (phase1-stage3.sh) — UUID fallback to "REPLACE_ME" caused unbootable systems. Fixed: die on missing UUIDs, validate all critical UUIDs before fstab generation.
+2. **Multi-LUKS device detection** (uuid.sh) — `head -n1` silently picked wrong device with multiple LUKS volumes. Fixed: warn on multiple devices, suggest CRYPT_UUID_OVERRIDE.
+3. **GRUB config injection** (41_logos_profiles) — Sourcing /etc/default/grub allowed arbitrary code execution. Fixed: use grep-only extraction of UUID.
+4. **Contradictory kernel config** (phase2-transform.sh) — CONFIG_BTRFS_FS set to both enable and module (last wins=module). Fixed: removed duplicate, keep built-in.
+5. **Kernel build error handling** (phase2-transform.sh) — make targets had no error checking. Fixed: `|| die` on all make commands.
+
+### Additional Hardening
+- Atomic UUID file writes (uuid.sh) — prevents partial files from interrupted installs
+- Watchdog counter validation (kernel-watchdog.sh) — resets corrupted counter instead of crashing
+- Service enable validation (phase2-transform.sh) — individual service enable with per-service warnings
+- Firewall validation (phase2-transform.sh) — warn on UFW configuration failures
+- Kernel verification (phase2-transform.sh) — die if no kernel found in /boot after install
+
+### Checkpoint
+**Status:** CONTINUE — All critical/high issues fixed. Remaining: VM boot test (needs sudo), hardware test, stability test.
