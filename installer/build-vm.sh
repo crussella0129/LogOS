@@ -122,9 +122,21 @@ mkdir -p "${WORK_DIR}" "${MNT}" "${LOG_DIR}" "${STAGE3_CACHE}"
 # Clean up leftovers from any previous failed build
 if [[ -e "/dev/mapper/${LUKS_NAME}" ]]; then
     log "Closing stale LUKS mapping '${LUKS_NAME}' from previous run"
-    umount -l "${MNT}"/* 2>/dev/null || true
-    umount -l "${MNT}" 2>/dev/null || true
-    cryptsetup close "${LUKS_NAME}" 2>/dev/null || true
+    # Unmount everything under MNT (reverse order to handle nested mounts)
+    if mountpoint -q "${MNT}" 2>/dev/null || mount | grep -q "${MNT}"; then
+        for mp in $(mount | grep "${MNT}" | awk '{print $3}' | sort -r); do
+            umount -l "${mp}" 2>/dev/null || true
+        done
+    fi
+    # Force close LUKS — dmsetup as fallback if cryptsetup fails
+    cryptsetup close "${LUKS_NAME}" 2>/dev/null || {
+        log "cryptsetup close failed, trying dmsetup remove"
+        dmsetup remove --force "${LUKS_NAME}" 2>/dev/null || true
+    }
+    # Verify it's gone
+    if [[ -e "/dev/mapper/${LUKS_NAME}" ]]; then
+        die "Cannot remove stale /dev/mapper/${LUKS_NAME} — reboot may be required"
+    fi
 fi
 # Detach any loop devices still pointing at our image
 for ld in $(losetup -j "${IMG_RAW}" 2>/dev/null | cut -d: -f1); do
