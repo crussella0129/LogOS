@@ -412,3 +412,68 @@ The 2026-02-07 build failed because:
 
 ### Checkpoint
 **Status:** CONTINUE — Re-run `sudo ./test-vm/build-bootable.sh` needed. All identified issues fixed.
+
+---
+
+## Entry #9 — 2026-02-08
+
+### Summary
+Full rebuild. Deleted 29-file installer and NBD-based build script. Replaced with single self-contained `installer/build-vm.sh` using losetup instead of NBD.
+
+### Why
+The previous architecture failed repeatedly due to:
+1. Stale device-mapper entries from failed NBD builds
+2. Automounter races with NBD partition devices
+3. Cross-script complexity (5 phases + 3 libraries = fragile UUID passing, mount-state bugs)
+4. Heredoc-in-heredoc quoting nightmares in chroot scripts
+
+### What Was Deleted
+- `installer-gentoo/` (29 files: 5 phase scripts, 3 libraries, configs, security, tools, overlay)
+- `installer/`, `installer-proto/` (legacy)
+- `test-vm/` (broken NBD build script) — root-owned stage3 cache remains (gitignored)
+- `LLM Log Bank/`
+- `LogOS_Build_Guide_2025_MASTER_v7.md`
+
+### What Was Built
+```
+installer/
+  build-vm.sh                    # Single self-contained VM build (~350 lines)
+  configs/
+    make.conf                    # Minimal: -O2 -pipe, no ccache, no -march=native
+    package.use/logos             # installkernel dracut grub, systemd cryptsetup, etc.
+    package.license/logos         # linux-firmware licenses
+```
+
+### Key Architecture Changes
+| Old | New | Why |
+|-----|-----|-----|
+| NBD (qemu-nbd) | losetup (loop devices) | Built into kernel, no module, no stale dm |
+| qcow2 disk | Raw → convert at end | losetup requires raw |
+| 5 phases + 3 libs | 1 script | No cross-script state bugs |
+| Heredoc-in-heredoc | Separate files + cp | No quoting nightmares |
+| `-march=native` | `-O2 -pipe` | Building in chroot, not on target |
+| 4GB /boot | 1GB /boot | Only need ~200MB |
+| ccache | Removed | One-time build |
+
+### Build Script: 10 Steps
+1. Create 30G raw disk image (truncate)
+2. Attach loop device (losetup --partscan)
+3. Partition (sgdisk: 1G EFI + 1G Boot + remainder Root)
+4. LUKS2 (Argon2id) + Btrfs (4 subvolumes: @, @home, @snapshots, @log)
+5. Capture UUIDs (blkid)
+6. Stage3 download + extract (cached)
+7. Deploy configs (make.conf, fstab, crypttab, dracut, GRUB defaults as /tmp files)
+8. Chroot: sync, profile, @world, kernel, dracut, GRUB, networking, users
+9. Unmount + qemu-img convert raw→qcow2
+10. Boot test (QEMU + OVMF, serial console)
+
+### Lessons Preserved from Previous Entries
+- `rd.luks.uuid=` (dracut), NOT `cryptdevice=` (Arch/mkinitcpio)
+- `--removable` for GRUB (OVMF finds EFI/BOOT/BOOTX64.EFI)
+- `hostonly="no"` in dracut (chroot host differs from VM)
+- Explicit PATH in chroot (`source /etc/profile` alone may miss /usr/sbin)
+- glibc masking fallback (unmask + accept_keywords)
+- `chattr +C` for nodatacow (not a mount option)
+
+### Checkpoint
+**Status:** CONTINUE — Run `sudo ./installer/build-vm.sh` to build and boot-test the VM.

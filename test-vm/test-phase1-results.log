@@ -1,8 +1,0 @@
-Phase 1 Test — 2026-02-07T22:03:23-05:00
-PASS: 41
-FAIL: 0
-Stage3: stage3-amd64-systemd-20260201T164555Z.tar.xz (257 MB)
-CRYPT_UUID: 17b2f9b1-6ff1-474c-850c-e4166ee5d356
-BTRFS_UUID: 4da8e635-286f-4ca4-b7bb-40250c555eef
-Portage config: make.conf + 3 package.use + accept_keywords + licenses
-Fstab: 6 Btrfs subvols + boot + EFI

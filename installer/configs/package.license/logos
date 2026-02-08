@@ -1,0 +1,3 @@
+# LogOS — firmware license acceptance
+# linux-firmware contains blobs with various licenses
+sys-kernel/linux-firmware linux-fw-redistributable no-source-code

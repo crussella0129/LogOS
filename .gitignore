@@ -12,3 +12,7 @@
 
 pkg/
 src/
+
+# Build artifacts
+installer/build/
+installer/logs/
