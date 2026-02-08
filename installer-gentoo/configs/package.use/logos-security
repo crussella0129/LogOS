@@ -23,6 +23,9 @@ net-firewall/ufw iptables
 # GnuPG
 app-crypt/gnupg usb smartcard
 
+# GRUB — device-mapper support for encrypted root
+sys-boot/grub device-mapper
+
 # Kernel security modules
 sys-kernel/gentoo-kernel savedconfig
 sys-kernel/installkernel dracut grub

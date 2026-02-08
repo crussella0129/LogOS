@@ -171,9 +171,12 @@ emerge_pkgs sys-boot/grub
 log "Writing GRUB defaults"
 cp "${SCRIPT_DIR}/grub/grub-defaults" /etc/default/grub
 
-# Inject LUKS UUID into GRUB defaults
+# Inject UUIDs into GRUB defaults
 if [[ -n "${CRYPT_UUID:-}" ]]; then
   sed -i "s|@CRYPT_UUID@|${CRYPT_UUID}|g" /etc/default/grub
+fi
+if [[ -n "${BTRFS_UUID:-}" ]]; then
+  sed -i "s|@BTRFS_UUID@|${BTRFS_UUID}|g" /etc/default/grub
 fi
 
 log "Installing GRUB to EFI"

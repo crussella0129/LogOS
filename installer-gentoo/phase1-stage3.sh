@@ -133,7 +133,7 @@ eselect profile set default/linux/amd64/23.0/desktop/systemd
 
 # ── Update @world ─────────────────────────────────────────────
 log "Updating @world set (this will take a while)"
-emerge --update --deep --newuse --quiet @world
+emerge --update --deep --changed-use --with-bdeps=y --quiet @world
 
 # ── Timezone ──────────────────────────────────────────────────
 log "Setting timezone to ${TARGET_TIMEZONE}"

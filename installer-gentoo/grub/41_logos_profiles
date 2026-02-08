@@ -73,7 +73,7 @@ menuentry "LogOS - Gael [Maximum Security]" --class logos --class gnu-linux --cl
     cryptomount -u ${CRYPT_UUID_NO_DASH}
     search --no-floppy --fs-uuid --set=root ${BTRFS_UUID}
     echo 'Loading Gael - Maximum Security...'
-    linux ${GAEL_KPATH} root=UUID=${BTRFS_UUID} rootflags=subvol=@ rw cryptdevice=UUID=${CRYPT_UUID}:cryptroot audit=1 apparmor=1 lsm=landlock,lockdown,yama,integrity,apparmor,bpf lockdown=confidentiality mitigations=auto,nosmt nosmt=force init_on_alloc=1 init_on_free=1 slab_nomerge pti=on quiet loglevel=3
+    linux ${GAEL_KPATH} root=UUID=${BTRFS_UUID} rootflags=subvol=@ rw rd.luks.uuid=${CRYPT_UUID} rd.luks.name=${CRYPT_UUID}=cryptroot audit=1 apparmor=1 lsm=landlock,lockdown,yama,integrity,apparmor,bpf lockdown=confidentiality mitigations=auto,nosmt nosmt=force init_on_alloc=1 init_on_free=1 slab_nomerge pti=on quiet loglevel=3
     echo 'Loading initial ramdisk...'
     initrd ${GAEL_IPATH}
 }
@@ -96,7 +96,7 @@ menuentry "LogOS - Midir [Daily Driver]" --class logos --class gnu-linux --class
     cryptomount -u ${CRYPT_UUID_NO_DASH}
     search --no-floppy --fs-uuid --set=root ${BTRFS_UUID}
     echo 'Loading Midir - Daily Driver...'
-    linux ${MIDIR_KPATH} root=UUID=${BTRFS_UUID} rootflags=subvol=@ rw cryptdevice=UUID=${CRYPT_UUID}:cryptroot audit=1 apparmor=1 lsm=landlock,lockdown,yama,integrity,apparmor,bpf mitigations=auto quiet loglevel=3
+    linux ${MIDIR_KPATH} root=UUID=${BTRFS_UUID} rootflags=subvol=@ rw rd.luks.uuid=${CRYPT_UUID} rd.luks.name=${CRYPT_UUID}=cryptroot audit=1 apparmor=1 lsm=landlock,lockdown,yama,integrity,apparmor,bpf mitigations=auto quiet loglevel=3
     echo 'Loading initial ramdisk...'
     initrd ${MIDIR_IPATH}
 }
@@ -119,7 +119,7 @@ menuentry "LogOS - Halflight [Performance]" --class logos --class gnu-linux --cl
     cryptomount -u ${CRYPT_UUID_NO_DASH}
     search --no-floppy --fs-uuid --set=root ${BTRFS_UUID}
     echo 'Loading Halflight - Performance Mode...'
-    linux ${HALF_KPATH} root=UUID=${BTRFS_UUID} rootflags=subvol=@ rw cryptdevice=UUID=${CRYPT_UUID}:cryptroot audit=0 mitigations=off nowatchdog nmi_watchdog=0 quiet loglevel=3
+    linux ${HALF_KPATH} root=UUID=${BTRFS_UUID} rootflags=subvol=@ rw rd.luks.uuid=${CRYPT_UUID} rd.luks.name=${CRYPT_UUID}=cryptroot audit=0 mitigations=off nowatchdog nmi_watchdog=0 quiet loglevel=3
     echo 'Loading initial ramdisk...'
     initrd ${HALF_IPATH}
 }
@@ -147,7 +147,7 @@ if [[ -n "${GAEL_KERNEL}" ]]; then
         insmod luks2
         cryptomount -u ${CRYPT_UUID_NO_DASH}
         search --no-floppy --fs-uuid --set=root ${BTRFS_UUID}
-        linux ${GAEL_KPATH} root=UUID=${BTRFS_UUID} rootflags=subvol=@ rw cryptdevice=UUID=${CRYPT_UUID}:cryptroot
+        linux ${GAEL_KPATH} root=UUID=${BTRFS_UUID} rootflags=subvol=@ rw rd.luks.uuid=${CRYPT_UUID} rd.luks.name=${CRYPT_UUID}=cryptroot
         initrd ${GAEL_FPATH}
     }
 EOF
@@ -166,7 +166,7 @@ if [[ -n "${STABLE_KERNEL}" ]] && [[ "${STABLE_KERNEL}" != "${GAEL_KERNEL}" ]]; 
         insmod luks2
         cryptomount -u ${CRYPT_UUID_NO_DASH}
         search --no-floppy --fs-uuid --set=root ${BTRFS_UUID}
-        linux ${STABLE_KPATH} root=UUID=${BTRFS_UUID} rootflags=subvol=@ rw cryptdevice=UUID=${CRYPT_UUID}:cryptroot
+        linux ${STABLE_KPATH} root=UUID=${BTRFS_UUID} rootflags=subvol=@ rw rd.luks.uuid=${CRYPT_UUID} rd.luks.name=${CRYPT_UUID}=cryptroot
         initrd ${STABLE_IPATH}
     }
 EOF

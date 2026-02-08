@@ -15,7 +15,7 @@ MAKEOPTS="-j@NPROC@ -l@NPROC@"
 # Global USE flags — LogOS defaults
 USE="systemd networkmanager bluetooth pulseaudio pipewire vulkan wayland \
      apparmor audit pam crypt luks btrfs zstd lzma lz4 \
-     rust dbus policykit udisks \
+     rust dbus policykit udisks dist-kernel \
      -gnome -kde -qt5 -gtk2 -telemetry -test"
 
 # Accept all free licenses + linux-fw-redistributable
@@ -26,8 +26,7 @@ FEATURES="parallel-fetch candy ccache"
 CCACHE_DIR="/var/cache/ccache"
 CCACHE_SIZE="10G"
 
-# Portage directories
-PORTDIR="/var/db/repos/gentoo"
+# Portage directories (PORTDIR deprecated — repos.conf used instead)
 DISTDIR="/var/cache/distfiles"
 PKGDIR="/var/cache/binpkgs"
 
@@ -45,13 +44,12 @@ INPUT_DEVICES="libinput"
 # Grub platforms
 GRUB_PLATFORMS="efi-64"
 
-# Locale
+# Locale (LINGUAS deprecated — use L10N)
 L10N="en"
-LINGUAS="en"
 
 # Python targets
 PYTHON_TARGETS="python3_11 python3_12"
 PYTHON_SINGLE_TARGET="python3_12"
 
-# Emerge default options
-EMERGE_DEFAULT_OPTS="--jobs=4 --load-average=@NPROC@"
+# Emerge default options (--jobs=2 to avoid OOM with parallel make)
+EMERGE_DEFAULT_OPTS="--jobs=2 --load-average=@NPROC@ --changed-use"

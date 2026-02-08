@@ -401,9 +401,10 @@ if ! command -v grub-mkconfig &>/dev/null; then
   exit 1
 fi
 
-# Deploy GRUB config with real LUKS UUID
+# Deploy GRUB config with real UUIDs
 cp /root/installer-gentoo/grub/grub-defaults /etc/default/grub
 sed -i "s|@CRYPT_UUID@|${CRYPT_UUID}|g" /etc/default/grub
+sed -i "s|@BTRFS_UUID@|${BTRFS_UUID}|g" /etc/default/grub
 
 # Install profile generator
 mkdir -p /etc/grub.d
