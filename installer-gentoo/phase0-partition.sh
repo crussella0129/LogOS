@@ -85,7 +85,7 @@ cryptsetup luksFormat \
   "${PART_ROOT}"
 
 log "Opening LUKS volume"
-cryptsetup open "${PART_ROOT}" cryptroot
+cryptsetup open "${PART_ROOT}" cryptroot || die "Failed to open LUKS volume"
 
 # ── Btrfs + Subvolumes ───────────────────────────────────────────
 log "Creating Btrfs filesystem on /dev/mapper/cryptroot"
@@ -110,20 +110,20 @@ umount /mnt
 
 # ── Mount Hierarchy ──────────────────────────────────────────────
 log "Mounting subvolumes"
-mount -o "subvol=@,${BTRFS_OPTS}" /dev/mapper/cryptroot /mnt
+mount -o "subvol=@,${BTRFS_OPTS}" /dev/mapper/cryptroot /mnt || die "Failed to mount root subvolume"
 
 mkdir -p /mnt/{home,srv/cold-canon,srv/warm-mesh,var/log,.snapshots,boot}
 
-mount -o "subvol=@home,${BTRFS_OPTS}"     /dev/mapper/cryptroot /mnt/home
-mount -o "subvol=@canon,${BTRFS_OPTS}"    /dev/mapper/cryptroot /mnt/srv/cold-canon
-mount -o "subvol=@mesh,${BTRFS_OPTS}"     /dev/mapper/cryptroot /mnt/srv/warm-mesh
-mount -o "subvol=@snapshots,${BTRFS_OPTS}" /dev/mapper/cryptroot /mnt/.snapshots
-mount -o "subvol=@log,${BTRFS_OPTS}" /dev/mapper/cryptroot /mnt/var/log
+mount -o "subvol=@home,${BTRFS_OPTS}"     /dev/mapper/cryptroot /mnt/home || die "Failed to mount @home"
+mount -o "subvol=@canon,${BTRFS_OPTS}"    /dev/mapper/cryptroot /mnt/srv/cold-canon || die "Failed to mount @canon"
+mount -o "subvol=@mesh,${BTRFS_OPTS}"     /dev/mapper/cryptroot /mnt/srv/warm-mesh || die "Failed to mount @mesh"
+mount -o "subvol=@snapshots,${BTRFS_OPTS}" /dev/mapper/cryptroot /mnt/.snapshots || die "Failed to mount @snapshots"
+mount -o "subvol=@log,${BTRFS_OPTS}" /dev/mapper/cryptroot /mnt/var/log || die "Failed to mount @log"
 chattr +C /mnt/var/log
 
-mount "${PART_BOOT}" /mnt/boot
+mount "${PART_BOOT}" /mnt/boot || die "Failed to mount boot partition"
 mkdir -p /mnt/boot/efi
-mount "${PART_EFI}"  /mnt/boot/efi
+mount "${PART_EFI}"  /mnt/boot/efi || die "Failed to mount EFI partition"
 
 # ── Save UUIDs ────────────────────────────────────────────────────
 CRYPT_UUID="$(blkid -s UUID -o value "${PART_ROOT}")"

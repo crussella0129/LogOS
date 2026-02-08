@@ -35,37 +35,32 @@ systemctl enable sddm.service
 # ── GPU Auto-Detection ────────────────────────────────────────────
 log "Detecting GPU hardware"
 if command -v lspci >/dev/null 2>&1; then
-  GPU_DETECTED=""
+  VIDEO_CARDS_LIST=""
 
   if lspci | grep -qi nvidia; then
     log "  NVIDIA GPU detected"
-    GPU_DETECTED="nvidia"
     emerge_pkgs x11-drivers/nvidia-drivers
-    # Update make.conf
-    if ! grep -q 'VIDEO_CARDS.*nvidia' /etc/portage/make.conf; then
-      echo 'VIDEO_CARDS="nvidia"' >> /etc/portage/make.conf
-    fi
+    VIDEO_CARDS_LIST="${VIDEO_CARDS_LIST} nvidia"
   fi
 
   if lspci | grep -qi "amd.*vga\|radeon\|amdgpu"; then
     log "  AMD GPU detected"
-    GPU_DETECTED="amd"
     emerge_pkgs media-libs/mesa x11-drivers/xf86-video-amdgpu
-    if ! grep -q 'VIDEO_CARDS.*amdgpu' /etc/portage/make.conf; then
-      echo 'VIDEO_CARDS="amdgpu radeonsi"' >> /etc/portage/make.conf
-    fi
+    VIDEO_CARDS_LIST="${VIDEO_CARDS_LIST} amdgpu radeonsi"
   fi
 
   if lspci | grep -qi "intel.*vga\|intel.*graphics"; then
     log "  Intel GPU detected"
-    GPU_DETECTED="intel"
     emerge_pkgs media-libs/mesa media-libs/intel-media-driver
-    if ! grep -q 'VIDEO_CARDS.*intel' /etc/portage/make.conf; then
-      echo 'VIDEO_CARDS="intel"' >> /etc/portage/make.conf
-    fi
+    VIDEO_CARDS_LIST="${VIDEO_CARDS_LIST} intel"
   fi
 
-  if [[ -z "${GPU_DETECTED}" ]]; then
+  if [[ -n "${VIDEO_CARDS_LIST}" ]]; then
+    # Remove any existing VIDEO_CARDS line and write once
+    sed -i '/^VIDEO_CARDS=/d' /etc/portage/make.conf
+    echo "VIDEO_CARDS=\"${VIDEO_CARDS_LIST# }\"" >> /etc/portage/make.conf
+    log "  VIDEO_CARDS set to:${VIDEO_CARDS_LIST}"
+  else
     log "  No discrete GPU detected — using framebuffer"
   fi
 else
