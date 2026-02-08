@@ -16,3 +16,4 @@ src/
 # Build artifacts
 installer/build/
 installer/logs/
+test-vm/
