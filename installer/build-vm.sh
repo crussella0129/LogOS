@@ -22,11 +22,28 @@ LOG_DIR="${SCRIPT_DIR}/logs"
 CHROOT_LOG="${LOG_DIR}/chroot.log"
 DISK_SIZE="30G"
 LUKS_NAME="cryptroot"
-LUKS_PASS="REDACTED_PASS"
 HOSTNAME="logos"
 USER_NAME="logos"
-USER_PASS="logos"
-ROOT_PASS="REDACTED_ROOT_PASS"
+
+# Credentials — NEVER hardcode. Read from env or prompt at runtime.
+if [[ -n "${LOGOS_LUKS_PASS:-}" ]]; then
+    LUKS_PASS="${LOGOS_LUKS_PASS}"
+else
+    read -rsp "Enter LUKS passphrase for VM: " LUKS_PASS; echo
+    [[ -n "${LUKS_PASS}" ]] || die "LUKS passphrase cannot be empty"
+fi
+if [[ -n "${LOGOS_ROOT_PASS:-}" ]]; then
+    ROOT_PASS="${LOGOS_ROOT_PASS}"
+else
+    read -rsp "Enter root password for VM: " ROOT_PASS; echo
+    [[ -n "${ROOT_PASS}" ]] || die "Root password cannot be empty"
+fi
+if [[ -n "${LOGOS_USER_PASS:-}" ]]; then
+    USER_PASS="${LOGOS_USER_PASS}"
+else
+    read -rsp "Enter password for user '${USER_NAME}': " USER_PASS; echo
+    [[ -n "${USER_PASS}" ]] || die "User password cannot be empty"
+fi
 STAGE3_CACHE="${WORK_DIR}/stage3-cache"
 STAGE3_MIRROR="https://distfiles.gentoo.org/releases/amd64/autobuilds"
 
@@ -517,8 +534,7 @@ done
 [[ -n "${OVMF}" ]] || die "OVMF firmware not found — install sys-firmware/edk2-ovmf"
 
 log "Booting VM with QEMU (serial console)"
-log "  LUKS passphrase: ${LUKS_PASS}"
-log "  Login: ${USER_NAME} / ${USER_PASS}"
+log "  Login user: ${USER_NAME}"
 log "  Exit: Ctrl-A X"
 log ""
 

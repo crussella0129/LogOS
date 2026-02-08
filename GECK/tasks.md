@@ -22,7 +22,7 @@
 ### Build & Test
 - [ ] Run `sudo ./installer/build-vm.sh` — full VM build
 - [ ] GRUB menu appears in QEMU serial console
-- [ ] LUKS passphrase prompt works (REDACTED_PASS)
+- [ ] LUKS passphrase prompt works
 - [ ] systemd boots to login prompt
 - [ ] Login as logos/logos succeeds
 - [ ] Network (DHCP) works inside VM
