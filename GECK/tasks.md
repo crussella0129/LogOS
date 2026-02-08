@@ -51,7 +51,9 @@
 - [x] Test Phase 0-1 in QEMU/KVM (36+41 PASS, 0 FAIL — via NBD against qcow2)
 - [x] Test Phase 2 (110 PASS, 0 FAIL — GRUB profiles, security, watchdog, tools)
 - [x] Test Phase 3+4 logic (203 PASS, 0 FAIL — script structure, packages, GPU, overlays, Canon, tools)
-- [ ] Test Phase 3 desktop load (KDE Plasma boots — requires full VM boot)
+- [ ] Test Phase 3 desktop load (KDE Plasma boots — requires full VM boot with sudo)
+- [x] Build VM infrastructure (build-bootable.sh — NBD+chroot approach)
+- [x] Fix make.conf portage compatibility ($(nproc) → @NPROC@ placeholder)
 - [x] Test kernel degradation (watchdog logic verified: whitelist, counter, Gael fallback)
 - [x] Run `logos-validate-boot` — script validates all 10+ check categories
 - [x] Create ebuilds in logos-overlay for: sdrangel, obsidian-bin, kiwix-tools, kiwix-desktop, shannon

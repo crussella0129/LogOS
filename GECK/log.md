@@ -320,3 +320,32 @@ Phase 3+4 tested — 203 PASS, 0 FAIL. QEMU boot automation script created.
 - Stability under load
 
 ---
+
+## Entry #6 — 2026-02-07
+
+### Summary
+VM build infrastructure created. Fixed portage make.conf compatibility bug. NBD+chroot build script ready for full VM creation.
+
+### Work Done
+**make.conf Portage Bug Fix:**
+- `make.conf.base` contained `$(nproc)` shell substitutions on MAKEOPTS and EMERGE_DEFAULT_OPTS lines
+- Portage's Python config parser cannot handle `$()` — causes `bad substitution` error
+- All emerge operations silently fail when make.conf has syntax errors
+- Fixed: `$(nproc)` → `@NPROC@` placeholder; phase1-stage3.sh runs `sed -i "s/@NPROC@/$(nproc)/g"` at install time
+- Build script (build-bootable.sh) applies same substitution
+
+**Build Script (`test-vm/build-bootable.sh`):**
+- NBD+chroot approach: attach qcow2 via NBD → partition → LUKS2 → Btrfs → stage3 → chroot emerge → GRUB → boot test
+- 5 build steps: disk creation, stage3 bootstrap, chroot build (kernel+GRUB+security), GRUB EFI install, QEMU boot verification
+- Supports `--resume N` to skip completed steps, `--minimal` for fast testing
+- Includes serial console auto-login for QEMU boot testing
+- Chroot build installs: gentoo-kernel, dracut, GRUB, NetworkManager, SSH, security configs, watchdog, tools, overlay, branding
+
+**Debugging Lessons Learned:**
+- sgdisk combined partition creation fails with NBD (backup GPT write issues) — use separate calls with `|| true`
+- `cryptsetup luksFormat` needs `--batch-mode` for non-interactive use
+- dm-mapper devices from failed builds persist and block new LUKS creation — need unique names or clean NBD state
+- `gentoo-kernel` (source-compiled) more reliable than `gentoo-kernel-bin` in chroot
+
+### Checkpoint
+**Status:** CONTINUE — Build script ready, needs sudo to run full VM build. Remaining: execute build, boot test, hardware test.

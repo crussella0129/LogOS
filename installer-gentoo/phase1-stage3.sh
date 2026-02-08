@@ -86,6 +86,8 @@ tar xpf "${STAGE3_PATH}" --xattrs-include='*.*' --numeric-owner -C /mnt
 # ── Install Portage Configuration ────────────────────────────────
 log "Installing LogOS portage configuration"
 cp "${SCRIPT_DIR}/configs/make.conf.base" /mnt/etc/portage/make.conf
+# Substitute @NPROC@ placeholder with actual core count
+sed -i "s/@NPROC@/$(nproc)/g" /mnt/etc/portage/make.conf
 
 mkdir -p /mnt/etc/portage/package.use
 cp "${SCRIPT_DIR}"/configs/package.use/* /mnt/etc/portage/package.use/

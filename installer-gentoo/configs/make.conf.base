@@ -9,8 +9,8 @@ FCFLAGS="${COMMON_FLAGS}"
 FFLAGS="${COMMON_FLAGS}"
 RUSTFLAGS="-C target-cpu=native"
 
-# Parallel build jobs (set to nproc during install)
-MAKEOPTS="-j$(nproc) -l$(nproc)"
+# Parallel build jobs — @NPROC@ replaced by installer, or set manually
+MAKEOPTS="-j@NPROC@ -l@NPROC@"
 
 # Global USE flags — LogOS defaults
 USE="systemd networkmanager bluetooth pulseaudio pipewire vulkan wayland \
@@ -54,4 +54,4 @@ PYTHON_TARGETS="python3_11 python3_12"
 PYTHON_SINGLE_TARGET="python3_12"
 
 # Emerge default options
-EMERGE_DEFAULT_OPTS="--jobs=4 --load-average=$(nproc)"
+EMERGE_DEFAULT_OPTS="--jobs=4 --load-average=@NPROC@"
