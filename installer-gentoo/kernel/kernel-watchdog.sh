@@ -127,6 +127,12 @@ main() {
 
   local counter
   counter="$(read_counter)"
+  # Validate counter is a non-negative integer
+  if ! [[ "${counter}" =~ ^[0-9]+$ ]]; then
+    log "WARNING: Counter file corrupted (value: '${counter}') — resetting to 0"
+    counter=0
+    write_counter 0
+  fi
   log "Current failure counter: ${counter}"
 
   # Run health checks

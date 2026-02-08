@@ -26,8 +26,8 @@ HARDENED_INITRD="$(find_initrd 'hardened')"
 GAEL_KERNEL="${HARDENED_KERNEL:-$STABLE_KERNEL}"
 GAEL_INITRD="${HARDENED_INITRD:-$STABLE_INITRD}"
 
-# Read LUKS UUID from GRUB_CMDLINE_LINUX
-CRYPT_UUID="$(. /etc/default/grub 2>/dev/null; echo "${GRUB_CMDLINE_LINUX}" | grep -oP 'UUID=\K[a-f0-9-]+' | head -1)"
+# Read LUKS UUID from GRUB_CMDLINE_LINUX (grep only — no sourcing for safety)
+CRYPT_UUID="$(grep -oE 'UUID=[a-f0-9-]+' /etc/default/grub 2>/dev/null | head -1 | cut -d= -f2)"
 CRYPT_UUID_NO_DASH="${CRYPT_UUID//-/}"
 
 # Root filesystem UUID

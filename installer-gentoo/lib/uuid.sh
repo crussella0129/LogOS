@@ -17,11 +17,19 @@ detect_crypt_uuid() {
     return 0
   fi
 
-  local crypt_dev
-  crypt_dev="$(blkid -t TYPE=crypto_LUKS -o device | head -n1 || true)"
-  if [[ -z "${crypt_dev}" ]]; then
+  local crypt_dev crypt_count
+  crypt_count="$(blkid -t TYPE=crypto_LUKS -o device | wc -l)"
+  if [[ "${crypt_count}" -eq 0 ]]; then
     die "Unable to locate crypto_LUKS device. Set CRYPT_UUID_OVERRIDE."
   fi
+  if [[ "${crypt_count}" -gt 1 ]]; then
+    warn "Multiple LUKS devices found (${crypt_count}). Using first one."
+    warn "Set CRYPT_UUID_OVERRIDE to specify explicitly."
+    blkid -t TYPE=crypto_LUKS -o device | while read -r dev; do
+      warn "  ${dev}: UUID=$(blkid -s UUID -o value "${dev}")"
+    done
+  fi
+  crypt_dev="$(blkid -t TYPE=crypto_LUKS -o device | head -n1)"
   CRYPT_UUID="$(blkid -s UUID -o value "${crypt_dev}")"
   log "Detected CRYPT_UUID: ${CRYPT_UUID}"
 }
@@ -56,11 +64,14 @@ detect_btrfs_uuid() {
 # Save UUIDs to file for later phases
 save_uuids() {
   local uuid_file="${1:-/tmp/logos-uuids}"
+  local tmp_file="${uuid_file}.tmp.$$"
   log "Saving UUIDs to ${uuid_file}"
-  cat > "${uuid_file}" << EOF
+  cat > "${tmp_file}" << EOF
 CRYPT_UUID="${CRYPT_UUID}"
 BTRFS_UUID="${BTRFS_UUID}"
 EOF
+  mv "${tmp_file}" "${uuid_file}" || die "Failed to save UUIDs atomically"
+  chmod 600 "${uuid_file}"
 }
 
 # Load UUIDs from file

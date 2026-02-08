@@ -47,18 +47,17 @@ if [[ -n "${ZEN_SRC}" ]]; then
   scripts/config --enable CONFIG_BLK_DEV_DM
   scripts/config --enable CONFIG_DM_CRYPT
   scripts/config --enable CONFIG_BTRFS_FS
+  scripts/config --enable CONFIG_BTRFS_FS_POSIX_ACL
   scripts/config --enable CONFIG_CRYPTO_AES
   scripts/config --enable CONFIG_CRYPTO_XTS
   scripts/config --enable CONFIG_CRYPTO_SHA512
   scripts/config --enable CONFIG_SECURITY_APPARMOR
   scripts/config --enable CONFIG_AUDIT
-  scripts/config --module CONFIG_BTRFS_FS
-  scripts/config --enable CONFIG_BTRFS_FS_POSIX_ACL
 
-  make olddefconfig
-  make -j"$(nproc)"
-  make modules_install
-  make install
+  make olddefconfig || die "Kernel config failed"
+  make -j"$(nproc)" || die "Kernel build failed"
+  make modules_install || die "Kernel module installation failed"
+  make install || die "Kernel install failed"
 
   cd "${SCRIPT_DIR}"
 else
@@ -78,15 +77,22 @@ if [[ "${ENABLE_HARDENED:-0}" == "1" ]]; then
     scripts/config --enable CONFIG_BLK_DEV_DM
     scripts/config --enable CONFIG_DM_CRYPT
     scripts/config --enable CONFIG_BTRFS_FS
+    scripts/config --enable CONFIG_BTRFS_FS_POSIX_ACL
     scripts/config --enable CONFIG_SECURITY_APPARMOR
     scripts/config --enable CONFIG_AUDIT
-    make olddefconfig
-    make -j"$(nproc)"
-    make modules_install
-    make install
+    make olddefconfig || die "Hardened kernel config failed"
+    make -j"$(nproc)" || die "Hardened kernel build failed"
+    make modules_install || die "Hardened kernel module installation failed"
+    make install || die "Hardened kernel install failed"
     cd "${SCRIPT_DIR}"
   fi
 fi
+
+# Verify at least one kernel was installed
+if ! ls /boot/vmlinuz-* &>/dev/null; then
+  die "No kernel found in /boot — kernel installation failed"
+fi
+log "Kernel verification: $(ls /boot/vmlinuz-* 2>/dev/null | wc -l) kernel(s) installed"
 
 # ── Initramfs (dracut) ───────────────────────────────────────────
 log "Configuring dracut"
@@ -118,17 +124,19 @@ emerge_pkgs sys-apps/apparmor sys-apps/apparmor-utils \
             net-analyzer/fail2ban \
             net-misc/openssh
 
-systemctl enable apparmor.service
-systemctl enable auditd.service
-systemctl enable ufw.service
-systemctl enable fail2ban.service
-systemctl enable sshd.service
+for svc in apparmor auditd ufw fail2ban sshd; do
+  if systemctl enable "${svc}.service" 2>/dev/null; then
+    log "  Enabled: ${svc}"
+  else
+    warn "Failed to enable ${svc} — package may not be installed"
+  fi
+done
 
 # ── Firewall defaults ────────────────────────────────────────────
 log "Configuring firewall"
-ufw default deny incoming
-ufw default allow outgoing
-ufw --force enable
+ufw default deny incoming || warn "Failed to set default deny policy"
+ufw default allow outgoing || warn "Failed to set default allow policy"
+ufw --force enable || warn "Failed to enable firewall"
 
 # ── Sysctl hardening ─────────────────────────────────────────────
 log "Applying sysctl hardening"
