@@ -126,6 +126,22 @@ UDEVRULE
   umount "${NBD_DEV}p2" 2>/dev/null || true
   umount "${NBD_DEV}p3" 2>/dev/null || true
 
+  # Remove any stale device-mapper entries on this partition (from previous runs)
+  if dmsetup ls 2>/dev/null | grep -q "logos-build"; then
+    log "Removing stale dm device 'logos-build' from previous run..."
+    cryptsetup close logos-build 2>/dev/null || true
+    dmsetup remove logos-build 2>/dev/null || true
+    sleep 2
+  fi
+  # Also remove any other dm entries pointing at nbd0p3
+  for dm in $(dmsetup ls 2>/dev/null | awk '{print $1}'); do
+    if dmsetup deps "${dm}" 2>/dev/null | grep -q "$(stat -c '%t:%T' "${NBD_DEV}p3" 2>/dev/null || echo 'NONE')"; then
+      log "Removing stale dm device '${dm}' on ${NBD_DEV}p3..."
+      dmsetup remove "${dm}" 2>/dev/null || true
+    fi
+  done
+  sleep 1
+
   # LUKS2
   log "Creating LUKS2 volume..."
   echo -n "${LUKS_PASS}" | cryptsetup luksFormat --batch-mode --type luks2 \
