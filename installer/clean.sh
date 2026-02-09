@@ -28,9 +28,6 @@ if [[ "${1:-}" == "--all" ]]; then
     WIPE_CACHE=true
 fi
 
-# ---- Freeze udev so automounter cannot re-grab devices during teardown ----
-log "Freezing udev event processing"
-udevadm control --stop-exec-queue 2>/dev/null || true
 # Ensure we always thaw udev on exit, even if we die mid-cleanup
 trap 'udevadm control --start-exec-queue 2>/dev/null || true' EXIT
 
@@ -57,16 +54,35 @@ force_close_dm() {
         log "  umount ${mp}"
         umount -l "${mp}" 2>/dev/null || true
     done
+    sleep 1
 
-    # Escalation ladder: cryptsetup → dmsetup --force → wipe_table → remove
-    cryptsetup close "${name}" 2>/dev/null && { log "  Closed (cryptsetup)"; return 0; }
-    dmsetup remove --force --retry "${name}" 2>/dev/null && { sleep 0.5; }
-    [[ -e "/dev/mapper/${name}" ]] || { log "  Closed (dmsetup)"; return 0; }
-    dmsetup wipe_table "${name}" 2>/dev/null || true
-    dmsetup remove --force "${name}" 2>/dev/null || true
+    # Freeze udev AFTER killing holders so they can actually die
+    udevadm control --stop-exec-queue 2>/dev/null || true
+
+    # Escalation ladder with timeouts — never hang
+    if timeout 5 cryptsetup close "${name}" 2>/dev/null; then
+        log "  Closed (cryptsetup)"
+        udevadm control --start-exec-queue 2>/dev/null || true
+        return 0
+    fi
+    timeout 5 dmsetup remove --force --retry "${name}" 2>/dev/null || true
     sleep 0.5
-    [[ -e "/dev/mapper/${name}" ]] || { log "  Closed (wipe+remove)"; return 0; }
+    if [[ ! -e "/dev/mapper/${name}" ]]; then
+        log "  Closed (dmsetup)"
+        udevadm control --start-exec-queue 2>/dev/null || true
+        return 0
+    fi
+    dmsetup wipe_table "${name}" 2>/dev/null || true
+    timeout 5 dmsetup remove --force "${name}" 2>/dev/null || true
+    sleep 0.5
 
+    # Thaw udev for next device
+    udevadm control --start-exec-queue 2>/dev/null || true
+
+    if [[ ! -e "/dev/mapper/${name}" ]]; then
+        log "  Closed (wipe+remove)"
+        return 0
+    fi
     log "  WARNING: /dev/mapper/${name} persists — will retry after device detach"
 }
 

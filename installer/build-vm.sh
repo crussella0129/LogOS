@@ -111,14 +111,15 @@ force_close_luks() {
     for mp in $(findmnt -n -o TARGET -S "/dev/mapper/${LUKS_NAME}" 2>/dev/null || true); do
         umount -l "${mp}" 2>/dev/null || true
     done
+    sleep 1
 
-    # Escalate: cryptsetup → dmsetup --force → wipe_table
-    cryptsetup close "${LUKS_NAME}" 2>/dev/null && return 0
-    dmsetup remove --force --retry "${LUKS_NAME}" 2>/dev/null || true
+    # Escalate with timeouts — never hang
+    if timeout 5 cryptsetup close "${LUKS_NAME}" 2>/dev/null; then return 0; fi
+    timeout 5 dmsetup remove --force --retry "${LUKS_NAME}" 2>/dev/null || true
     sleep 1
     [[ -e "/dev/mapper/${LUKS_NAME}" ]] || return 0
     dmsetup wipe_table "${LUKS_NAME}" 2>/dev/null || true
-    dmsetup remove --force "${LUKS_NAME}" 2>/dev/null || true
+    timeout 5 dmsetup remove --force "${LUKS_NAME}" 2>/dev/null || true
     sleep 1
 }
 
@@ -582,12 +583,6 @@ log "Chroot build completed successfully"
 # ---------------------------------------------------------------------------
 step 9 "Unmount + convert"
 
-# Freeze udev so automounter (udisksd/Nautilus) cannot re-grab devices
-# during teardown. This is the nuclear option — udev events queue up
-# and replay once we thaw, but by then the devices are gone.
-udev_freeze
-log "udev event processing paused"
-
 # Unmount virtual filesystems first
 umount -l "${MNT}/run" 2>/dev/null || true
 umount -l "${MNT}/dev/pts" 2>/dev/null || true
@@ -603,28 +598,39 @@ umount "${MNT}/var/log"
 umount "${MNT}/.snapshots"
 umount "${MNT}"
 
-# Wait for kernel to release all references
+# Kill anything that grabbed cryptroot (automounter)
+kill_holders "/dev/mapper/${LUKS_NAME}"
+for mp in $(findmnt -n -o TARGET -S "/dev/mapper/${LUKS_NAME}" 2>/dev/null || true); do
+    umount -l "${mp}" 2>/dev/null || true
+done
 sync
 sleep 2
 
-# Close LUKS
-force_close_luks
-if [[ -e "/dev/mapper/${LUKS_NAME}" ]]; then
-    # One more attempt after a longer wait
-    sleep 3
-    kill_holders "/dev/mapper/${LUKS_NAME}"
-    cryptsetup close "${LUKS_NAME}" 2>/dev/null || dmsetup remove --force "${LUKS_NAME}" 2>/dev/null || true
+# NOW freeze udev so nothing re-grabs while we close LUKS
+udev_freeze
+log "udev frozen — closing LUKS"
+
+if ! timeout 10 cryptsetup close "${LUKS_NAME}" 2>/dev/null; then
+    log "cryptsetup close timed out, forcing with dmsetup"
+    timeout 5 dmsetup remove --force --retry "${LUKS_NAME}" 2>/dev/null || true
+    sleep 1
+    if [[ -e "/dev/mapper/${LUKS_NAME}" ]]; then
+        dmsetup wipe_table "${LUKS_NAME}" 2>/dev/null || true
+        timeout 5 dmsetup remove --force "${LUKS_NAME}" 2>/dev/null || true
+        sleep 1
+    fi
 fi
+
 if [[ -e "/dev/mapper/${LUKS_NAME}" ]]; then
     udev_thaw
     die "Cannot close LUKS — /dev/mapper/${LUKS_NAME} still held. Run clean.sh and retry."
 fi
+log "LUKS closed"
 
 # Detach loop device
 losetup -d "${LOOP_DEV}"
 unset LOOP_DEV  # Prevent cleanup trap from double-detaching
 
-# Resume udev
 udev_thaw
 log "All filesystems unmounted, udev resumed"
 
