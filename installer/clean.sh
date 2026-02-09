@@ -28,6 +28,12 @@ if [[ "${1:-}" == "--all" ]]; then
     WIPE_CACHE=true
 fi
 
+# ---- Freeze udev so automounter cannot re-grab devices during teardown ----
+log "Freezing udev event processing"
+udevadm control --stop-exec-queue 2>/dev/null || true
+# Ensure we always thaw udev on exit, even if we die mid-cleanup
+trap 'udevadm control --start-exec-queue 2>/dev/null || true' EXIT
+
 # ---- Helper: kill all processes holding a device ----
 kill_holders() {
     local dev="$1"
@@ -176,6 +182,10 @@ if [[ -d "${SCRIPT_DIR}/../test-vm" ]]; then
     log "Removing legacy test-vm/"
     rm -rf "${SCRIPT_DIR}/../test-vm"
 fi
+
+# ---- Resume udev ----
+log "Resuming udev event processing"
+udevadm control --start-exec-queue 2>/dev/null || true
 
 if [[ "${any_stuck}" == true ]]; then
     log "Clean finished with warnings — reboot to clear stuck dm entries."

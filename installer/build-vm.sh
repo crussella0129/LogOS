@@ -104,7 +104,7 @@ kill_holders() {
 force_close_luks() {
     [[ -e "/dev/mapper/${LUKS_NAME}" ]] || return 0
 
-    # Kill automounter (Nautilus/udisksd) holding the device
+    # Kill anything holding the mapper device
     kill_holders "/dev/mapper/${LUKS_NAME}"
 
     # Unmount anything automounted from cryptroot
@@ -122,8 +122,14 @@ force_close_luks() {
     sleep 1
 }
 
+# Freeze/thaw udev — prevents automounter (udisksd/Nautilus) from grabbing
+# devices while we tear down filesystems, LUKS, and loop devices.
+udev_freeze()  { udevadm control --stop-exec-queue  2>/dev/null || true; }
+udev_thaw()    { udevadm control --start-exec-queue 2>/dev/null || true; }
+
 cleanup() {
     log "Cleaning up..."
+    udev_freeze
     for mp in "${MNT}/boot/efi" "${MNT}/boot" "${MNT}/home" "${MNT}/var/log" "${MNT}/.snapshots" "${MNT}/proc" "${MNT}/sys" "${MNT}/dev/pts" "${MNT}/dev" "${MNT}/run" "${MNT}"; do
         umount -l "${mp}" 2>/dev/null || true
     done
@@ -135,6 +141,7 @@ cleanup() {
         kill_holders "${LOOP_DEV}"
         losetup -d "${LOOP_DEV}" 2>/dev/null || true
     fi
+    udev_thaw
 }
 trap cleanup EXIT
 
@@ -575,6 +582,12 @@ log "Chroot build completed successfully"
 # ---------------------------------------------------------------------------
 step 9 "Unmount + convert"
 
+# Freeze udev so automounter (udisksd/Nautilus) cannot re-grab devices
+# during teardown. This is the nuclear option — udev events queue up
+# and replay once we thaw, but by then the devices are gone.
+udev_freeze
+log "udev event processing paused"
+
 # Unmount virtual filesystems first
 umount -l "${MNT}/run" 2>/dev/null || true
 umount -l "${MNT}/dev/pts" 2>/dev/null || true
@@ -590,21 +603,30 @@ umount "${MNT}/var/log"
 umount "${MNT}/.snapshots"
 umount "${MNT}"
 
-# Kill automounter holding cryptroot, then close LUKS
+# Wait for kernel to release all references
+sync
+sleep 2
+
+# Close LUKS
 force_close_luks
 if [[ -e "/dev/mapper/${LUKS_NAME}" ]]; then
+    # One more attempt after a longer wait
+    sleep 3
+    kill_holders "/dev/mapper/${LUKS_NAME}"
+    cryptsetup close "${LUKS_NAME}" 2>/dev/null || dmsetup remove --force "${LUKS_NAME}" 2>/dev/null || true
+fi
+if [[ -e "/dev/mapper/${LUKS_NAME}" ]]; then
+    udev_thaw
     die "Cannot close LUKS — /dev/mapper/${LUKS_NAME} still held. Run clean.sh and retry."
 fi
 
-# Kill automounter on loop partitions, then detach
-for part in "${LOOP_DEV}"p*; do
-    [[ -e "${part}" ]] && kill_holders "${part}"
-done
-kill_holders "${LOOP_DEV}"
+# Detach loop device
 losetup -d "${LOOP_DEV}"
 unset LOOP_DEV  # Prevent cleanup trap from double-detaching
 
-log "All filesystems unmounted"
+# Resume udev
+udev_thaw
+log "All filesystems unmounted, udev resumed"
 
 # Convert raw → qcow2 (compressed)
 log "Converting to qcow2 (this may take a few minutes)"
