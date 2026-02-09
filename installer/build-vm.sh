@@ -93,15 +93,48 @@ BOOT_SIZE="1G"
 # Root = remainder
 
 # ---------------------------------------------------------------------------
-# Cleanup trap — robust teardown
+# Cleanup trap — robust teardown (kills automounter holders)
 # ---------------------------------------------------------------------------
+kill_holders() {
+    local dev="$1"
+    [[ -e "${dev}" ]] || return 0
+    fuser -k "${dev}" 2>/dev/null && sleep 0.5 || true
+}
+
+force_close_luks() {
+    [[ -e "/dev/mapper/${LUKS_NAME}" ]] || return 0
+
+    # Kill automounter (Nautilus/udisksd) holding the device
+    kill_holders "/dev/mapper/${LUKS_NAME}"
+
+    # Unmount anything automounted from cryptroot
+    for mp in $(findmnt -n -o TARGET -S "/dev/mapper/${LUKS_NAME}" 2>/dev/null || true); do
+        umount -l "${mp}" 2>/dev/null || true
+    done
+
+    # Escalate: cryptsetup → dmsetup --force → wipe_table
+    cryptsetup close "${LUKS_NAME}" 2>/dev/null && return 0
+    dmsetup remove --force --retry "${LUKS_NAME}" 2>/dev/null || true
+    sleep 1
+    [[ -e "/dev/mapper/${LUKS_NAME}" ]] || return 0
+    dmsetup wipe_table "${LUKS_NAME}" 2>/dev/null || true
+    dmsetup remove --force "${LUKS_NAME}" 2>/dev/null || true
+    sleep 1
+}
+
 cleanup() {
     log "Cleaning up..."
     for mp in "${MNT}/boot/efi" "${MNT}/boot" "${MNT}/home" "${MNT}/var/log" "${MNT}/.snapshots" "${MNT}/proc" "${MNT}/sys" "${MNT}/dev/pts" "${MNT}/dev" "${MNT}/run" "${MNT}"; do
         umount -l "${mp}" 2>/dev/null || true
     done
-    cryptsetup close "${LUKS_NAME}" 2>/dev/null || true
-    [[ -n "${LOOP_DEV:-}" ]] && losetup -d "${LOOP_DEV}" 2>/dev/null || true
+    force_close_luks
+    if [[ -n "${LOOP_DEV:-}" ]]; then
+        for part in "${LOOP_DEV}"p*; do
+            [[ -e "${part}" ]] && kill_holders "${part}"
+        done
+        kill_holders "${LOOP_DEV}"
+        losetup -d "${LOOP_DEV}" 2>/dev/null || true
+    fi
 }
 trap cleanup EXIT
 
@@ -120,27 +153,22 @@ command -v qemu-system-x86_64 >/dev/null || die "qemu-system-x86_64 not found"
 mkdir -p "${WORK_DIR}" "${MNT}" "${LOG_DIR}" "${STAGE3_CACHE}"
 
 # Clean up leftovers from any previous failed build
+if mountpoint -q "${MNT}" 2>/dev/null || mount | grep -q "${MNT}"; then
+    log "Unmounting stale mounts from previous run"
+    for mp in $(mount | grep "${MNT}" | awk '{print $3}' | sort -r); do
+        umount -l "${mp}" 2>/dev/null || true
+    done
+fi
 if [[ -e "/dev/mapper/${LUKS_NAME}" ]]; then
     log "Closing stale LUKS mapping '${LUKS_NAME}' from previous run"
-    # Unmount everything under MNT (reverse order to handle nested mounts)
-    if mountpoint -q "${MNT}" 2>/dev/null || mount | grep -q "${MNT}"; then
-        for mp in $(mount | grep "${MNT}" | awk '{print $3}' | sort -r); do
-            umount -l "${mp}" 2>/dev/null || true
-        done
-    fi
-    # Force close LUKS — dmsetup as fallback if cryptsetup fails
-    cryptsetup close "${LUKS_NAME}" 2>/dev/null || {
-        log "cryptsetup close failed, trying dmsetup remove"
-        dmsetup remove --force "${LUKS_NAME}" 2>/dev/null || true
-    }
-    # Verify it's gone
+    force_close_luks
     if [[ -e "/dev/mapper/${LUKS_NAME}" ]]; then
-        die "Cannot remove stale /dev/mapper/${LUKS_NAME} — reboot may be required"
+        die "Cannot remove stale /dev/mapper/${LUKS_NAME} — run clean.sh or reboot"
     fi
 fi
-# Detach any loop devices still pointing at our image
 for ld in $(losetup -j "${IMG_RAW}" 2>/dev/null | cut -d: -f1); do
     log "Detaching stale loop device ${ld}"
+    kill_holders "${ld}"
     losetup -d "${ld}" 2>/dev/null || true
 done
 
@@ -562,10 +590,17 @@ umount "${MNT}/var/log"
 umount "${MNT}/.snapshots"
 umount "${MNT}"
 
-# Close LUKS
-cryptsetup close "${LUKS_NAME}"
+# Kill automounter holding cryptroot, then close LUKS
+force_close_luks
+if [[ -e "/dev/mapper/${LUKS_NAME}" ]]; then
+    die "Cannot close LUKS — /dev/mapper/${LUKS_NAME} still held. Run clean.sh and retry."
+fi
 
-# Detach loop device
+# Kill automounter on loop partitions, then detach
+for part in "${LOOP_DEV}"p*; do
+    [[ -e "${part}" ]] && kill_holders "${part}"
+done
+kill_holders "${LOOP_DEV}"
 losetup -d "${LOOP_DEV}"
 unset LOOP_DEV  # Prevent cleanup trap from double-detaching
 
