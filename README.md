@@ -5,7 +5,7 @@
 
 > *"A civilization does not collapse when it loses data. It collapses when it loses procedural knowledge."*
 
-LogOS is a hardened, encrypted, offline-capable Arch Linux system with local LLM inference and a three-tier knowledge preservation topology. It ships with a cyberdeck-first desktop (Hyprland) themed after the end of the world.
+LogOS is a hardened, encrypted, offline-capable Arch Linux system with Animus local LLM inference (<https://github.com/crussella0129/Animus>) and a three-tier knowledge preservation topology that includes the GitGael Surviavl Repo (<https://github.com/crussella0129/GitGael>). It ships with a cyberdeck-first desktop (Hyprland) with a theme and color scheme fitting the end of the world (from Dark Souls 3 at least).
 
 ---
 
