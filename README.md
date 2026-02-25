@@ -682,7 +682,6 @@ VirtualBox/VMware: Create VM with 8 GB RAM, 120 GB disk, **UEFI firmware enabled
 ```
 LogOS-Arch/
 ├── docs/
-│   ├── build-guide.md              # Literate build guide (supplementary reference)
 │   └── appendices/
 │       ├── threat-model.md         # Threat model + security boundaries
 │       ├── hardware-compat.md      # Verified hardware + GPU matrix
