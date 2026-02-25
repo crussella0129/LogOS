@@ -1,56 +1,279 @@
 # LogOS — Ontology Substrate Operating System
 
 **Version:** 2025.8 (Ringed City)
-**Base:** Arch Linux | **Architecture:** x86_64
+**Base:** Arch Linux | **Arch:** x86_64 | **License:** GPLv3
 
 > *"A civilization does not collapse when it loses data. It collapses when it loses procedural knowledge."*
 
-LogOS is an Arch Linux-based operating system designed for knowledge preservation and survivability. It provides a hardened, encrypted, offline-capable system with on-the-metal LLM inference and a three-tier knowledge preservation topology.
+LogOS is a hardened, encrypted, offline-capable Arch Linux system with local LLM inference and a three-tier knowledge preservation topology. It ships with a cyberdeck-first desktop (Hyprland) themed after the end of the world.
 
 ---
 
-## How to Use This Repo
+## What You Get
 
-This repository is a **literate build guide** — the documentation IS the source of truth, and companion scripts automate what the guide explains.
-
-1. [`docs/build-guide.md`](docs/build-guide.md) — **Start here.** The complete build guide explains *what* and *why* for every step.
-2. `scripts/` — Numbered companion scripts referenced by the guide. Each is independently runnable.
-3. `lib/` — Shared functions sourced by all scripts.
-4. `logos.conf.example` — All user choices in one file. Copy to `logos.conf` and edit.
-
-You can follow the guide and run scripts, or read the guide and type every command manually. Either way, you understand what you're building.
+- **Hyprland cyberdeck desktop** with Waybar, Rofi, Dunst, and the Ringed City color palette (ember gold on ash)
+- **Full-disk encryption** — LUKS2 + Argon2id, unlocked at boot via GRUB
+- **Triple-kernel architecture** — linux, linux-lts, linux-zen with Ringed City boot profiles
+- **Pre-boot security** — AppArmor, audit, sysctl hardening, UFW, fail2ban configured before first login
+- **Btrfs** — 7 subvolumes, zstd compression, snapshots, copies=2 on archival data
+- **Local LLM** — Ollama with configurable models, no cloud dependency
+- **Offline knowledge** — Kiwix (Wikipedia, Arch Wiki, Stack Overflow)
+- **Template-based theming** — switch between Ringed City, Catppuccin Mocha, or Dracula with one config line
 
 ---
 
-## Quick Start
+## Hardware Requirements
+
+| Component | Minimum | Recommended |
+|-----------|---------|-------------|
+| CPU | x86_64 with UEFI | Any modern 64-bit CPU |
+| Storage | 120 GB | 512 GB+ (NVMe preferred) |
+| RAM | 4 GB | 16 GB+ (for local LLM) |
+| Network | Required for install | Ethernet simplest |
+| Boot mode | **UEFI only** | Secure Boot supported |
+
+---
+
+## Flash Drive Test: Step by Step
+
+This walks you through a complete LogOS install on bare metal or VM from a USB flash drive.
+
+### 1. Prepare on Your Current Machine
 
 ```bash
-# 1. Download and verify the Arch Linux ISO
-#    (see docs/build-guide.md Section 1)
+# Download and verify the Arch ISO
+wget https://mirrors.kernel.org/archlinux/iso/latest/archlinux-x86_64.iso
+wget https://mirrors.kernel.org/archlinux/iso/latest/archlinux-x86_64.iso.sig
+wget https://mirrors.kernel.org/archlinux/iso/latest/sha256sums.txt
+sha256sum -c sha256sums.txt --ignore-missing
+gpg --keyserver-options auto-key-retrieve --verify archlinux-x86_64.iso.sig
 
-# 2. Clone this repo (on any machine with git)
-git clone https://github.com/crussella0129/LogOS-Arch.git
+# Write to USB (replace sdX — get this wrong and you destroy the wrong disk)
+lsblk
+sudo dd bs=4M if=archlinux-x86_64.iso of=/dev/sdX conv=fsync oflag=direct status=progress
+sync
+```
+
+Or use [Ventoy](https://ventoy.net/) to put multiple ISOs on one USB.
+
+### 2. Clone the Repo (on the USB or another drive)
+
+You need the LogOS repo accessible from the live environment. Options:
+
+- **Clone onto a second USB** and mount it after booting
+- **Clone after booting** (requires network): `git clone https://github.com/crussella0129/LogOS-Arch.git`
+- **Pre-stage on the Arch ISO USB** using Ventoy's file partition
+
+### 3. Configure `logos.conf`
+
+```bash
+cd LogOS-Arch
+cp logos.conf.example logos.conf
+nano logos.conf    # or vim, whatever is available
+```
+
+**Must set before running anything:**
+
+| Variable | What to set | How to find it |
+|----------|-------------|----------------|
+| `LOGOS_DISK` | Target disk (e.g., `/dev/nvme0n1`, `/dev/sda`) | `lsblk` |
+| `LOGOS_HOSTNAME` | Machine name | Your choice |
+| `LOGOS_USERNAME` | Your login username | Your choice |
+| `LOGOS_TIMEZONE` | Timezone | `timedatectl list-timezones \| grep America` |
+
+**Desktop and theme (optional, defaults shown):**
+
+| Variable | Default | Options |
+|----------|---------|---------|
+| `LOGOS_DESKTOP` | `hyprland` | `hyprland`, `kde`, `sway`, `i3` |
+| `LOGOS_THEME` | `ringed-city` | `ringed-city`, `catppuccin-mocha`, `dracula` |
+| `LOGOS_TERMINAL` | *(auto)* | `kitty`, `alacritty` (empty = desktop default) |
+
+**Package toggles (1=install, 0=skip):**
+
+| Variable | Default | Packages |
+|----------|---------|----------|
+| `LOGOS_PKG_OFFICE` | 1 | LibreOffice, Thunderbird, Firefox, Chromium |
+| `LOGOS_PKG_DEV` | 1 | VS Code, Git, Python, Node.js, Docker |
+| `LOGOS_PKG_SECURITY` | 0 | Wireshark, nmap, hashcat, Metasploit (AUR) |
+| `LOGOS_PKG_RADIO` | 0 | GQRX, GNU Radio, Direwolf, SDRangel (AUR) |
+| `LOGOS_PKG_GAMING` | 0 | Steam, Lutris, Wine, MangoHud |
+| `LOGOS_PKG_MEDIA` | 1 | VLC, mpv, OBS, GIMP, Inkscape, Audacity |
+| `LOGOS_PKG_ENGINEERING` | 0 | FreeCAD, KiCad, Blender, Fusion 360 (AUR) |
+
+### 4. Boot the Arch ISO
+
+Boot your target machine from the USB. Select **"Arch Linux install medium (x86_64, UEFI)"**.
+
+If on WiFi:
+```bash
+iwctl
+# station wlan0 scan
+# station wlan0 get-networks
+# station wlan0 connect "YourNetworkName"
+# exit
+```
+
+### 5. Run the Build
+
+The entire build is 10 scripts run in order. Each script validates its own prerequisites and will stop if something is wrong.
+
+**Phase A — Live USB (scripts 00-02)**
+
+```bash
 cd LogOS-Arch
 
-# 3. Configure
-cp logos.conf.example logos.conf
-# Edit logos.conf — at minimum set LOGOS_DISK, LOGOS_HOSTNAME, LOGOS_USERNAME, LOGOS_TIMEZONE
+# Verify live environment (UEFI, network, clock, keyring)
+bash scripts/00-verify-env.sh
 
-# 4. Follow the guide
-#    Boot the Arch ISO, then follow docs/build-guide.md section by section
+# Partition, encrypt, create Btrfs subvolumes
+# ⚠ THIS DESTROYS ALL DATA ON LOGOS_DISK
+bash scripts/01-disk-setup.sh
+
+# Install base packages, generate fstab, copy LogOS to new system
+bash scripts/02-base-install.sh
 ```
+
+**Phase B — Chroot (scripts 03-05)**
+
+```bash
+arch-chroot /mnt
+
+# System identity: timezone, locale, user, mkinitcpio
+bash /root/LogOS/03-chroot-setup.sh
+# → You will be prompted to set root and user passwords
+
+# GRUB bootloader with Ringed City profiles
+bash /root/LogOS/04-bootloader.sh
+
+# Security hardening: sysctl, AppArmor, UFW, fail2ban, SSH
+bash /root/LogOS/05-security.sh
+
+exit  # leave chroot
+```
+
+**Phase C — Reboot**
+
+```bash
+umount -R /mnt
+reboot
+# Remove USB when prompted
+```
+
+Select **Midir** (daily driver) at the GRUB menu. Enter your LUKS passphrase. Log in.
+
+**Phase D — Booted System (scripts 06-09)**
+
+```bash
+cd /root/LogOS
+
+# Desktop environment + theme + GPU drivers
+sudo bash 06-desktop.sh
+
+# Optional package categories
+sudo bash 07-packages.sh
+
+# Knowledge infrastructure (Cold Canon, Ollama, Kiwix)
+sudo bash 08-knowledge.sh
+
+# Validate everything
+sudo bash 09-validate.sh
+```
+
+Reboot one more time to reach the desktop login.
+
+### 6. First Desktop Login
+
+| Desktop | What you'll see | Login action |
+|---------|----------------|-------------|
+| **Hyprland** | tuigreet TUI | Select your user, type password |
+| **KDE** | SDDM graphical | Click user, type password |
+| **Sway** | tuigreet TUI | Select your user, type password |
+| **i3** | LightDM graphical | Click user, type password |
+
+**Hyprland keybindings to get started:**
+
+| Key | Action |
+|-----|--------|
+| `Super + Return` | Terminal (kitty) |
+| `Super + D` | App launcher (Rofi) |
+| `Super + Q` | Close window |
+| `Super + 1-0` | Switch workspace |
+| `Super + Shift + 1-0` | Move window to workspace |
+| `Super + F` | Fullscreen |
+| `Super + V` | Toggle floating |
+| `Super + Shift + E` | Exit Hyprland |
+| `Print` | Screenshot (region) |
+| `Super + Shift + L` | Lock screen |
 
 ---
 
 ## Ringed City Boot Profiles
 
-Named after bosses from Dark Souls 3's "The Ringed City" DLC:
+Named after bosses from Dark Souls 3's *The Ringed City* DLC:
 
 | Profile | Kernel | Security | Use Case | Perf. Impact |
 |---------|--------|----------|----------|-------------|
-| **Gael** | linux-lts | Maximum — lockdown, no SMT, full LSM | Hostile environments | ~15-30% |
-| **Midir** | linux-zen | Balanced — auto mitigations, AppArmor | Daily driver | ~2-5% |
-| **Halflight** | linux-zen | Minimal — mitigations off | Gaming, media, HPC | None |
+| **Gael** | linux-lts | Maximum — lockdown, no SMT, full LSM, init_on_alloc/free | Hostile environments, border crossings | ~15-30% |
+| **Midir** | linux-zen | Balanced — auto mitigations, AppArmor, audit | Daily driver, general use | ~2-5% |
+| **Halflight** | linux-zen | Minimal — mitigations off, no audit | Gaming, media production, HPC | None |
+
+---
+
+## Color Themes
+
+All three themes are applied at install time across every dotfile (terminal, bar, launcher, notifications, lock screen, GTK).
+
+| Theme | Aesthetic | Background | Accent |
+|-------|-----------|-----------|--------|
+| **Ringed City** | Ash + ember gold (Dark Souls) | `#1a1714` | `#c78f40` |
+| **Catppuccin Mocha** | Warm pastels | `#1e1e2e` | `#cba6f7` |
+| **Dracula** | Classic dark | `#282a36` | `#bd93f9` |
+
+To switch themes, edit `LOGOS_THEME` in `logos.conf` and re-run `06-desktop.sh`.
+
+---
+
+## Desktop Stacks
+
+| | Hyprland (default) | KDE Plasma | Sway | i3 |
+|-|-------------------|------------|------|-----|
+| **Type** | Wayland compositor | Full DE | Wayland compositor | X11 tiling WM |
+| **Bar** | Waybar | KDE panel | Waybar | Polybar |
+| **Launcher** | Rofi (Wayland) | KRunner | Rofi (Wayland) | Rofi / dmenu |
+| **Notifications** | Dunst | KDE | Mako | Dunst |
+| **Terminal** | kitty | kitty | alacritty | alacritty |
+| **Login** | greetd + tuigreet | SDDM | greetd + tuigreet | LightDM |
+| **Lock** | hyprlock | KDE | swaylock | — |
+
+Shared across all desktops: Pipewire audio, auto-detected GPU drivers, Noto/Fira Code/JetBrains Mono fonts, Starship prompt, GTK dark theme.
+
+---
+
+## VM Quick Test
+
+If you want to test without touching hardware:
+
+```bash
+# Create disk image
+qemu-img create -f qcow2 logos-test.qcow2 120G
+
+# Boot with Arch ISO
+qemu-system-x86_64 \
+  -enable-kvm \
+  -m 8192 \
+  -cpu host \
+  -smp 4 \
+  -drive file=logos-test.qcow2,format=qcow2 \
+  -cdrom archlinux-x86_64.iso \
+  -boot d \
+  -bios /usr/share/ovmf/OVMF.fd \
+  -vga virtio \
+  -device virtio-net-pci,netdev=net0 \
+  -netdev user,id=net0
+```
+
+VirtualBox/VMware: Create VM with 8 GB RAM, 120 GB disk, **UEFI firmware enabled**, attach the Arch ISO.
 
 ---
 
@@ -59,87 +282,76 @@ Named after bosses from Dark Souls 3's "The Ringed City" DLC:
 ```
 LogOS-Arch/
 ├── docs/
-│   ├── build-guide.md              # The literate build guide (start here)
+│   ├── build-guide.md              # Literate build guide (the full story)
 │   └── appendices/
-│       ├── threat-model.md         # Formal threat model + security boundaries
-│       ├── hardware-compat.md      # Verified hardware + GPU decision matrix
-│       └── troubleshooting.md      # Failure modes + recovery procedures
+│       ├── threat-model.md         # Threat model + security boundaries
+│       ├── hardware-compat.md      # Verified hardware + GPU matrix
+│       └── troubleshooting.md      # Recovery procedures
 ├── scripts/
-│   ├── 00-verify-env.sh            # Live environment checks
-│   ├── 01-disk-setup.sh            # Partitioning + LUKS + Btrfs
+│   ├── 00-verify-env.sh            # Live env checks
+│   ├── 01-disk-setup.sh            # Partition + LUKS + Btrfs
 │   ├── 02-base-install.sh          # pacstrap + fstab
 │   ├── 03-chroot-setup.sh          # System identity + initramfs
 │   ├── 04-bootloader.sh            # GRUB + Ringed City profiles
-│   ├── 05-security.sh              # Sysctl, AppArmor, UFW, fail2ban, SSH
+│   ├── 05-security.sh              # Kernel hardening, firewall, SSH
 │   ├── 06-desktop.sh               # Desktop dispatcher (multi-DE)
-│   ├── 07-packages.sh              # Modular package categories
+│   ├── 07-packages.sh              # Optional package categories
 │   ├── 08-knowledge.sh             # Cold Canon + Ollama + Kiwix
-│   └── 09-validate.sh              # Post-build validation suite
+│   └── 09-validate.sh              # Post-build validation
 ├── lib/
-│   ├── common.sh                   # Shared logging, config, helpers
-│   ├── detect.sh                   # Hardware detection functions
-│   ├── desktop.sh                  # Shared desktop library (themes, templates)
-│   ├── desktop-hyprland.sh         # Hyprland packages + config
-│   ├── desktop-kde.sh              # KDE Plasma packages + config
-│   ├── desktop-sway.sh             # Sway packages + config
-│   └── desktop-i3.sh               # i3 packages + config
+│   ├── common.sh                   # Logging, config, package helpers
+│   ├── detect.sh                   # Hardware detection (CPU, GPU, disk)
+│   ├── desktop.sh                  # Theme engine, dotfile deployment
+│   ├── desktop-hyprland.sh         # Hyprland module
+│   ├── desktop-kde.sh              # KDE Plasma module
+│   ├── desktop-sway.sh             # Sway module
+│   └── desktop-i3.sh               # i3 module
 ├── dotfiles/
-│   ├── themes/                     # Color palettes (ringed-city, catppuccin, dracula)
-│   ├── hyprland/                   # Hyprland configs (hypr, waybar, rofi, dunst)
-│   ├── sway/                       # Sway configs (sway, waybar, mako)
-│   └── shared/                     # Cross-desktop (kitty, alacritty, starship, GTK)
-├── archive/
-│   └── LogOS_Build_Guide_2025_MASTER_v7.md  # Original master spec (reference)
-├── LLM Log Bank/                   # Historical session logs
+│   ├── themes/                     # ringed-city.sh, catppuccin-mocha.sh, dracula.sh
+│   ├── hyprland/                   # hypr/, waybar/, rofi/, dunst/
+│   ├── sway/                       # sway/, waybar/, mako/
+│   └── shared/                     # kitty/, alacritty/, starship, GTK
 ├── logos.conf.example              # Configuration template
-├── LICENSE                         # GPLv3
-└── .gitignore
+└── LICENSE
 ```
 
 ---
 
 ## Script Reference
 
-| Script | Description | Context |
-|--------|-------------|---------|
-| `00-verify-env.sh` | UEFI, network, clock, keyring, mirrors | Live USB |
-| `01-disk-setup.sh` | Partition, encrypt, create Btrfs subvolumes | Live USB |
-| `02-base-install.sh` | pacstrap Tier 0+1, generate fstab | Live USB |
-| `03-chroot-setup.sh` | Timezone, locale, user, mkinitcpio | arch-chroot |
-| `04-bootloader.sh` | GRUB install, Ringed City profiles | arch-chroot |
-| `05-security.sh` | Kernel hardening, firewall, fail2ban, SSH | chroot or booted |
-| `06-desktop.sh` | Desktop (Hyprland/KDE/Sway/i3), Pipewire, GPU, themes | Booted system |
-| `07-packages.sh` | Office, dev, security, radio, gaming, media, engineering | Booted system |
-| `08-knowledge.sh` | Cold Canon dirs, Ollama, Kiwix, branding | Booted system |
-| `09-validate.sh` | Read-only validation of all subsystems | Booted system |
+| # | Script | What it does | Runs on |
+|---|--------|-------------|---------|
+| 00 | `verify-env.sh` | UEFI, network, clock, keyring, mirrors | Live USB |
+| 01 | `disk-setup.sh` | Partition, LUKS2, Btrfs subvolumes | Live USB |
+| 02 | `base-install.sh` | pacstrap Tier 0+1, fstab, copy LogOS to system | Live USB |
+| 03 | `chroot-setup.sh` | Timezone, locale, user, mkinitcpio | arch-chroot |
+| 04 | `bootloader.sh` | GRUB + Ringed City boot profiles | arch-chroot |
+| 05 | `security.sh` | sysctl, AppArmor, UFW, fail2ban, SSH | arch-chroot |
+| 06 | `desktop.sh` | Desktop + theme + GPU + Pipewire + fonts | Booted system |
+| 07 | `packages.sh` | 7 optional package categories | Booted system |
+| 08 | `knowledge.sh` | Cold Canon, Ollama, Kiwix, branding | Booted system |
+| 09 | `validate.sh` | Read-only validation of all subsystems | Booted system |
 
 ---
 
-## Key Features
+## Troubleshooting
 
-- **Multi-desktop architecture** — Hyprland (default), KDE Plasma, Sway, i3
-- **Ringed City theme** — Dark Souls aesthetic with ember/gold accents; also ships Catppuccin Mocha and Dracula
-- **Template-based theming** — all dotfiles themed at install time via `@@THEME_*@@` substitution
-- **Triple-kernel architecture** — linux, linux-lts, linux-zen (optional linux-hardened)
-- **LUKS2 + Argon2id** full-disk encryption
-- **Btrfs** with 7 subvolumes, snapshots, compression, and copies=2 for archival data
-- **Pre-boot security** — AppArmor, audit, kernel hardening configured before first boot
-- **Defense in depth** — sysctl hardening, UFW firewall, fail2ban, SSH hardening
-- **Offline knowledge** — Ollama (local LLM), Kiwix (offline Wikipedia/docs)
-- **Cold Canon** — bitrot-protected archival storage with promotion pipeline
-- **Modular packages** — 7 optional categories, toggled via config file
+**Can't boot the USB?** Check UEFI is enabled in BIOS/firmware. Disable Secure Boot if the ISO won't load.
 
----
+**No network in live env?** Wired is plug-and-play. For WiFi, use `iwctl`. The verify script will tell you if it can't reach the network.
 
-## Requirements
+**LUKS passphrase prompt is slow at GRUB?** Normal. GRUB's crypto implementation is unoptimized. The second prompt (initramfs) is fast.
 
-- x86_64 architecture with UEFI support
-- 120 GB minimum storage (512 GB+ recommended)
-- 4 GB RAM minimum (16 GB+ recommended)
-- Internet connection for initial installation
+**Wrong disk in `logos.conf`?** Run `lsblk` to see all disks. NVMe drives are `/dev/nvme0n1`, SATA drives are `/dev/sda`.
+
+**Script fails mid-run?** Every script is re-runnable. Fix the issue and run it again. For chroot recovery, see [troubleshooting](docs/appendices/troubleshooting.md).
+
+**Hyprland won't start on NVIDIA?** The installer auto-configures NVIDIA Wayland env vars. If it still fails, check `/etc/environment.d/logos-nvidia.conf` exists. Fallback: set `LOGOS_DESKTOP=sway` or `LOGOS_DESKTOP=kde`.
 
 ---
 
-## License
+## Deep Dive
 
-GNU General Public License v3.0 — see [LICENSE](LICENSE).
+For the full rationale behind every design decision — why Argon2id over PBKDF2, why 7 subvolumes, why pre-boot security, how the Cold/Warm/Hot topology works — read the [Build Guide](docs/build-guide.md).
+
+For threat modeling, security boundaries, and profile selection criteria, see [Threat Model](docs/appendices/threat-model.md).
