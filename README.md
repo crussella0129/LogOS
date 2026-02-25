@@ -18,7 +18,7 @@ This document is the **source of truth** for building a LogOS system. Each secti
 - **Triple-kernel architecture** — linux, linux-lts, linux-zen with Ringed City boot profiles
 - **Pre-boot security** — AppArmor, audit, sysctl hardening, UFW, fail2ban configured before first login
 - **Btrfs** — 7 subvolumes, zstd compression, snapshots, copies=2 on archival data
-- **Local LLM** — Ollama with configurable models, no cloud dependency
+- **Local LLM** — Animus + Ollama with configurable models, no cloud dependency (Users choice between niche and highly compatible tool)
 - **Offline knowledge** — Kiwix (Wikipedia, Arch Wiki, Stack Overflow)
 - **Template-based theming** — switch between Ringed City, Catppuccin Mocha, or Dracula with one config line
 
