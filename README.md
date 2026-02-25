@@ -5,7 +5,9 @@
 
 > *"A civilization does not collapse when it loses data. It collapses when it loses procedural knowledge."*
 
-LogOS is a hardened, encrypted, offline-capable Arch Linux system with Animus local LLM inference (<https://github.com/crussella0129/Animus>) and a three-tier knowledge preservation topology that includes the GitGael Surviavl Repo (<https://github.com/crussella0129/GitGael>). It ships with a cyberdeck-first desktop (Hyprland) with a theme and color scheme fitting the end of the world (from Dark Souls 3 at least).
+LogOS is a hardened, encrypted, offline-capable Arch Linux system with Animus local LLM inference (<https://github.com/crussella0129/Animus>) and a three-tier knowledge preservation topology that includes the GitGael Survival Repo (<https://github.com/crussella0129/GitGael>). It ships with a cyberdeck-first desktop (Hyprland) with a theme and color scheme fitting the end of the world (from Dark Souls 3 at least).
+
+This document is the **source of truth** for building a LogOS system. Each section explains *what* you're doing and *why*, then gives the exact commands to run. The companion scripts automate each step; you can also use this guide as a reference for manual execution.
 
 ---
 
@@ -34,9 +36,9 @@ LogOS is a hardened, encrypted, offline-capable Arch Linux system with Animus lo
 
 ---
 
-## Flash Drive Test: Step by Step
+## Build Guide: Step by Step
 
-This walks you through a complete LogOS install on bare metal or VM from a USB flash drive.
+This walks you through a complete LogOS install on bare metal or VM from a USB flash drive. Every step has an explicit command to run and an explanation of why.
 
 ### 1. Prepare the USB with Ventoy
 
@@ -49,11 +51,19 @@ This walks you through a complete LogOS install on bare metal or VM from a USB f
 After Ventoy is installed, the USB shows up as a normal drive. Copy the Arch ISO onto it:
 
 1. Download the [latest Arch ISO](https://archlinux.org/download/)
-2. *(Optional)* Verify it:
+2. Verify it (a compromised installer is game over before you start):
    ```bash
+   # Download verification files from the same mirror
+   wget https://mirrors.kernel.org/archlinux/iso/latest/archlinux-x86_64.iso.sig
+   wget https://mirrors.kernel.org/archlinux/iso/latest/sha256sums.txt
+
+   # Verify checksum
    sha256sum -c sha256sums.txt --ignore-missing
+
+   # Verify GPG signature
    gpg --keyserver-options auto-key-retrieve --verify archlinux-x86_64.iso.sig
    ```
+   If the GPG signature fails, **do not proceed**. Re-download from a different mirror.
 3. Copy `archlinux-x86_64.iso` to the USB (drag and drop or `cp`)
 
 That's it. The USB is now bootable.
@@ -102,10 +112,10 @@ nano logos.conf    # or vim, whatever is available
 
 | Variable | What to set | How to find it |
 |----------|-------------|----------------|
-| `LOGOS_DISK` | Target disk (e.g., `/dev/nvme0n1`, `/dev/sda`) | `lsblk` |
-| `LOGOS_HOSTNAME` | Machine name | Your choice |
-| `LOGOS_USERNAME` | Your login username | Your choice |
-| `LOGOS_TIMEZONE` | Timezone | `timedatectl list-timezones \| grep America` |
+| `LOGOS_DISK` | Target disk (e.g., `/dev/nvme0n1`, `/dev/sda`) | `lsblk` — NVMe drives show as `nvme0n1`, SATA as `sda` |
+| `LOGOS_HOSTNAME` | Machine name (e.g., `logos`, `citadel`) | Your choice — alphanumeric, no spaces |
+| `LOGOS_USERNAME` | Your login username (e.g., `ashen`) | Your choice — lowercase, no spaces |
+| `LOGOS_TIMEZONE` | Timezone (e.g., `America/New_York`) | `timedatectl list-timezones \| grep America` |
 
 **Desktop and theme (optional, defaults shown):**
 
@@ -127,6 +137,8 @@ nano logos.conf    # or vim, whatever is available
 | `LOGOS_PKG_MEDIA` | 1 | VLC, mpv, OBS, GIMP, Inkscape, Audacity |
 | `LOGOS_PKG_ENGINEERING` | 0 | FreeCAD, KiCad, Blender, Fusion 360 (AUR) |
 
+**All other settings** (LUKS cipher, Btrfs mount options, kernel profiles, security toggles) have sane defaults. Review `logos.conf.example` for the full list.
+
 ### 4. Boot the Arch ISO
 
 Boot your target machine from the USB. Select **"Arch Linux install medium (x86_64, UEFI)"**.
@@ -134,51 +146,253 @@ Boot your target machine from the USB. Select **"Arch Linux install medium (x86_
 If on WiFi:
 ```bash
 iwctl
+# device list                     ← find your wireless device name
 # station wlan0 scan
 # station wlan0 get-networks
 # station wlan0 connect "YourNetworkName"
 # exit
 ```
 
-### 5. Run the Build
+### 5. Verify the Live Environment
 
-The entire build is 10 scripts run in order. Each script validates its own prerequisites and will stop if something is wrong.
+Before touching any disk, verify that the live environment is ready.
 
-**Phase A — Live USB (scripts 00-02)**
+**What this checks and why:**
+- **UEFI mode** — LogOS requires UEFI for Secure Boot compatibility and the GPT partition scheme. Legacy BIOS is not supported.
+- **Network** — Required for downloading packages via `pacstrap`. Wired is simplest; wireless uses `iwctl`.
+- **Clock sync** — Incorrect time causes GPG signature verification failures during package installation.
+- **Pacman keyring** — Stale keyrings cause package installation failures. The script refreshes keys and optionally optimizes mirrors.
 
 ```bash
 cd LogOS-Arch
-
-# Verify live environment (UEFI, network, clock, keyring)
 bash scripts/00-verify-env.sh
+```
 
-# Partition, encrypt, create Btrfs subvolumes
+This checks all of the above, refreshes the keyring, optionally optimizes mirrors (if `LOGOS_MIRROR_COUNTRY` is set in `logos.conf`), and displays your configuration summary for review.
+
+### 6. Disk Setup
+
+This is the most critical and **destructive** step. Everything on the target disk will be erased.
+
+#### Partition Scheme
+
+LogOS uses a three-partition GPT layout:
+
+| Partition | Size | Type | Filesystem | Mount |
+|-----------|------|------|------------|-------|
+| EFI | 1 GB | EF00 | FAT32 | `/boot/efi` |
+| Boot | 4 GB | 8300 | ext4 | `/boot` |
+| Root | Remainder | 8309 | LUKS2 → Btrfs | `/` |
+
+**Why a separate EFI partition?** GRUB's EFI stub lives here. Keeping it separate from `/boot` means the EFI System Partition only holds the bootloader, not kernel images — which matters for Secure Boot signing.
+
+**Why 4 GB for `/boot`?** The triple-kernel architecture generates six initramfs images (3 kernels × 2 initramfs each). Running out of `/boot` space during kernel updates is a common failure mode on Arch.
+
+#### LUKS2 Encryption
+
+LogOS uses LUKS2 with Argon2id as the key derivation function. Argon2id is resistant to both GPU-based and side-channel attacks, making it superior to PBKDF2 for passphrase-derived keys.
+
+| Parameter | Default | Why |
+|-----------|---------|-----|
+| `LOGOS_LUKS_CIPHER` | `aes-xts-plain64` | Industry standard, hardware-accelerated on modern CPUs |
+| `LOGOS_LUKS_KEY_SIZE` | `512` | 512-bit XTS = two 256-bit AES keys (one for encryption, one for tweak) |
+| `LOGOS_LUKS_HASH` | `sha512` | Used for master key digest |
+| `LOGOS_LUKS_PBKDF` | `argon2id` | Memory-hard KDF — resists GPU/ASIC brute-force and side-channel attacks |
+
+These defaults are strong. Change them only if you have a specific reason.
+
+#### Btrfs Subvolume Layout
+
+| Subvolume | Mount Point | Purpose |
+|-----------|-------------|---------|
+| `@` | `/` | Root filesystem |
+| `@home` | `/home` | User data |
+| `@canon` | `/srv/cold-canon` | Cold Canon archival (copies=2 for bitrot protection) |
+| `@mesh` | `/srv/warm-mesh` | Warm Mesh sync workspace |
+| `@snapshots` | `/.snapshots` | Snapper snapshots |
+| `@log` | `/var/log` | Logs (nodatacow for write performance) |
+| `@pkg` | `/var/cache/pacman/pkg` | Package cache |
+
+**Why separate subvolumes?** Each subvolume can have independent snapshot policies, mount options, and backup schedules. `@log` uses `nodatacow` because log files are write-heavy and don't benefit from copy-on-write. `@canon` uses `copies=2` so Btrfs stores two copies of each extent, providing protection against silent data corruption on archival data. `@pkg` is separated so package cache churn doesn't inflate snapshots.
+
+#### Run the script
+
+```bash
 # ⚠ THIS DESTROYS ALL DATA ON LOGOS_DISK
 bash scripts/01-disk-setup.sh
+```
 
-# Install base packages, generate fstab, copy LogOS to new system
+The script partitions the disk with `sgdisk`, formats LUKS2 (you'll be prompted for a passphrase), creates Btrfs with all seven subvolumes, and mounts everything at `/mnt`.
+
+### 7. Base Install
+
+With filesystems mounted, install the minimum packages needed to boot.
+
+#### Package Tiers
+
+LogOS uses a tiered installation strategy that minimizes the debugging surface if something goes wrong:
+
+**Tier 0 (Boot-Critical)** — Only packages required to reach a login prompt. If Tier 0 fails, debugging is trivial because the surface area is tiny.
+
+- `base`, `linux`, `linux-firmware`, `linux-headers` — kernel and core system
+- `linux-lts`, `linux-zen` — additional kernels for Ringed City profiles
+- `grub`, `efibootmgr` — bootloader
+- CPU microcode (`intel-ucode` or `amd-ucode`) — auto-detected via `lscpu`
+- `btrfs-progs`, `cryptsetup` — filesystem and encryption tools
+- `networkmanager` — post-boot connectivity
+- `sudo`, `nano`, `man-db`, `man-pages` — bare essentials
+
+**Tier 1 (Security Infrastructure)** — Installed immediately after Tier 0 because security should be configured *before* first boot, not bolted on after.
+
+- `apparmor`, `audit` — mandatory access control + audit logging
+- `ufw` — firewall
+- `openssh` — remote access (disabled by default)
+- `fail2ban` (optional) — brute-force protection
+
+#### Run the script
+
+```bash
 bash scripts/02-base-install.sh
 ```
 
-**Phase B — Chroot (scripts 03-05)**
+This runs `pacstrap` for Tier 0, installs Tier 1 via `arch-chroot`, generates fstab with `genfstab`, and copies the LogOS configuration into the new system at `/root/LogOS/`.
+
+### 8. Enter Chroot
+
+Now enter the new system to configure it before first boot:
 
 ```bash
 arch-chroot /mnt
+```
 
-# System identity: timezone, locale, user, mkinitcpio
+### 9. Chroot Configuration
+
+Inside the chroot, set the system identity (timezone, locale, hostname, users) and build the initramfs.
+
+#### mkinitcpio Hook Ordering
+
+The hook order in `mkinitcpio.conf` is critical — get it wrong and you can't unlock your disk at boot:
+
+```
+HOOKS=(base udev autodetect microcode modconf kms keyboard keymap consolefont block encrypt btrfs filesystems fsck)
+```
+
+**Why this order matters:**
+
+| Rule | Reason |
+|------|--------|
+| `keyboard` + `keymap` **before** `encrypt` | You need to type your LUKS passphrase — keyboard drivers must be loaded first |
+| `encrypt` **before** `filesystems` | The LUKS container must be opened before Btrfs can mount the root filesystem |
+| `btrfs` **before** `filesystems` | Enables Btrfs multi-device support so the subvolumes can be found |
+| `microcode` placed early | CPU errata fixes should be applied as early as possible during boot |
+| `kms` **before** `block` | Ensures GPU driver is loaded early for proper display during disk unlock |
+
+#### Run the script
+
+```bash
 bash /root/LogOS/03-chroot-setup.sh
 # → You will be prompted to set root and user passwords
+```
 
-# GRUB bootloader with Ringed City profiles
+This configures timezone, locale, keymap, hostname, creates your user, writes `mkinitcpio.conf` with the correct hook ordering, and runs `mkinitcpio -P` to generate initramfs for all installed kernels.
+
+### 10. Bootloader
+
+GRUB is the bootloader, configured with LUKS2 encryption support and the Ringed City boot profiles.
+
+#### Ringed City Profiles
+
+The three profiles are named after bosses from Dark Souls 3's *The Ringed City* DLC — each representing a different balance of defense and aggression:
+
+| Profile | Kernel | Security | Use Case | Perf. Impact |
+|---------|--------|----------|----------|-------------|
+| **Gael** | linux-lts | Maximum — lockdown, no SMT, full LSM, init_on_alloc/free | Hostile environments, border crossings | ~15-30% |
+| **Midir** | linux-zen | Balanced — auto mitigations, AppArmor, audit | Daily driver, general use | ~2-5% |
+| **Halflight** | linux-zen | Minimal — mitigations off, no audit | Gaming, media production, HPC | None |
+
+**Gael** (Slave Knight Gael) represents ultimate resilience through adversity. He uses `linux-lts` for maximum stability, `lockdown=confidentiality` to prevent runtime kernel modification, and `nosmt=force` to disable hyper-threading (Spectre mitigation).
+
+**Midir** (Darkeater Midir) balances power with calculated risk. `linux-zen` provides better scheduling and interactivity for desktop use, while `mitigations=auto` applies the kernel's recommended security patches.
+
+**Halflight** (Spear of the Church) prioritizes speed. `mitigations=off` removes all CPU vulnerability mitigations for maximum performance. Use only in trusted environments where the threat model permits it.
+
+#### Kernel Parameters Deep-Dive
+
+| Parameter | Gael | Midir | Halflight | Purpose |
+|-----------|------|-------|-----------|---------|
+| `cryptdevice=UUID=...:cryptroot` | ✓ | ✓ | ✓ | LUKS unlock at boot |
+| `apparmor=1` | ✓ | ✓ | — | Enable AppArmor LSM |
+| `audit=1` | ✓ | ✓ | — | Enable audit subsystem |
+| `lsm=...` | ✓ | ✓ | — | LSM stack ordering |
+| `lockdown=confidentiality` | ✓ | — | — | Prevent runtime kernel modification |
+| `mitigations=auto,nosmt` | ✓ | — | — | All CPU mitigations + SMT off |
+| `mitigations=auto` | — | ✓ | — | Recommended mitigations only |
+| `mitigations=off` | — | — | ✓ | No mitigations (max performance) |
+| `init_on_alloc=1 init_on_free=1` | ✓ | — | — | Zero memory on alloc/free |
+| `slab_nomerge` | ✓ | — | — | Prevent slab merging (hardening) |
+
+#### Run the script
+
+```bash
 bash /root/LogOS/04-bootloader.sh
+```
 
-# Security hardening: sysctl, AppArmor, UFW, fail2ban, SSH
+This writes GRUB defaults, installs GRUB to the EFI partition, creates the `41_logos_profiles` custom GRUB script with baked-in UUIDs for your disk, disables the default `10_linux` generator, and runs `grub-mkconfig`.
+
+### 11. Security Hardening
+
+Security in LogOS is configured *before* first boot — it's not an afterthought bolted on later. This is a deliberate design choice: every layer is active from the first login.
+
+#### Defense in Depth
+
+LogOS implements multiple overlapping security layers. Each layer addresses a different attack vector, so a failure in one doesn't compromise the system:
+
+| Layer | Mechanism | Protects Against |
+|-------|-----------|-----------------|
+| 1 | **LUKS2 disk encryption** | Data theft from powered-off device |
+| 2 | **Kernel hardening** (sysctl) | Information leaks, privilege escalation |
+| 3 | **AppArmor** | Per-application mandatory access control |
+| 4 | **Audit** | Post-incident forensics, compliance logging |
+| 5 | **UFW** | Unauthorized network access (default deny incoming) |
+| 6 | **fail2ban** | Brute-force login attempts |
+| 7 | **SSH hardening** | Remote access attack surface |
+
+#### Sysctl Hardening
+
+The `99-logos-hardening.conf` file restricts kernel information exposure:
+
+| Setting | Value | Purpose |
+|---------|-------|---------|
+| `kernel.kptr_restrict` | 2 | Hide kernel pointers from all users |
+| `kernel.dmesg_restrict` | 1 | Restrict dmesg to root |
+| `kernel.perf_event_paranoid` | 3 | Restrict perf events |
+| `kernel.sysrq` | 0 | Disable magic SysRq key |
+| `kernel.unprivileged_bpf_disabled` | 1 | Block unprivileged BPF |
+| `net.ipv4.tcp_syncookies` | 1 | SYN flood protection |
+| `net.ipv4.conf.all.rp_filter` | 1 | Reverse path filtering |
+
+#### SSH Hardening
+
+When `LOGOS_SSHD=1` in `logos.conf`, the SSH daemon is configured with:
+
+- `PermitRootLogin no` — root cannot SSH in
+- `PasswordAuthentication no` — keys only (no brute-force surface)
+- `MaxAuthTries 3` — lock out after 3 failed attempts
+- `ClientAliveInterval 300` — disconnect idle sessions after 5 minutes
+
+#### Run the script
+
+```bash
 bash /root/LogOS/05-security.sh
 
 exit  # leave chroot
 ```
 
-**Phase C — Reboot**
+This writes sysctl hardening, configures AppArmor + audit rules, sets up UFW (default deny incoming), and optionally configures fail2ban and SSH hardening based on your `logos.conf` settings.
+
+### 12. First Boot
+
+Everything before this point happens in the live environment or chroot. Now it's time to reboot into your LogOS system.
 
 ```bash
 umount -R /mnt
@@ -186,29 +400,201 @@ reboot
 # Remove USB when prompted
 ```
 
-Select **Midir** (daily driver) at the GRUB menu. Enter your LUKS passphrase. Log in.
+#### GRUB Menu
 
-**Phase D — Booted System (scripts 06-09)**
+On reboot, GRUB presents the Ringed City profiles:
+
+```
+LogOS - Gael [Maximum Security]
+LogOS - Midir [Daily Driver]
+LogOS - Halflight [Performance]
+LogOS Recovery Options ►
+```
+
+Select **Midir** for first boot (balanced default).
+
+#### LUKS Unlock
+
+You'll be prompted for your LUKS passphrase at two stages:
+
+1. **GRUB stage** — GRUB unlocks the encrypted partition to find kernel images. This may appear slow — GRUB's cryptographic implementation is unoptimized. This is normal.
+2. **initramfs stage** — The `encrypt` hook unlocks the partition again for the actual root mount. This is fast.
+
+After unlocking, you should reach a login prompt. Log in with the username and password you set in step 9.
+
+### 13. Desktop
+
+After the first successful boot, install the desktop environment and apply the color theme.
+
+#### Why Hyprland as Default?
+
+Hyprland is a dynamic Wayland compositor with smooth animations, per-monitor workspaces, and a modern feature set. It represents the "cyberdeck superfluid" philosophy — fast, keyboard-driven, visually distinctive. If you need maximum stability or X11 compatibility, choose Sway or i3.
+
+| Desktop | Type | Login Manager | Default Terminal | Use Case |
+|---------|------|---------------|-----------------|----------|
+| **Hyprland** (default) | Wayland compositor | greetd + tuigreet | kitty | Cyberdeck experience — tiling, animations, modern Wayland |
+| **KDE Plasma** | Full desktop | SDDM | kitty | Traditional full-featured desktop with GUI tools |
+| **Sway** | Wayland compositor | greetd + tuigreet | alacritty | i3-compatible Wayland — minimal, stable, proven |
+| **i3** | X11 tiling WM | LightDM | alacritty | Classic X11 tiling — maximum compatibility |
+
+#### Desktop Stack
+
+All desktops share a common foundation:
+
+**Shared packages:**
+- **Audio:** Pipewire + ALSA/Pulse/JACK bridges + Wireplumber
+- **Fonts:** Noto (CJK + emoji), Liberation, DejaVu, Fira Code, JetBrains Mono
+- **Utilities:** xdg-user-dirs, xdg-utils
+- **GPU drivers:** Auto-detected (see below)
+
+**Shared dotfiles:** Terminal config (kitty and/or alacritty), Starship prompt, GTK 3/4 settings (dark theme, cursor, icon theme).
+
+#### GPU Detection
+
+The script auto-detects your GPU(s) via `lspci` and installs appropriate drivers:
+
+| GPU | Packages | Notes |
+|-----|----------|-------|
+| NVIDIA | `nvidia nvidia-utils nvidia-settings nvidia-lts` | Proprietary; Wayland env vars auto-configured |
+| AMD | `mesa vulkan-radeon libva-mesa-driver` | Open-source, recommended for Wayland |
+| Intel | `mesa vulkan-intel intel-media-driver` | Open-source, integrated GPUs |
+
+For NVIDIA on Wayland (Hyprland/Sway), the script writes environment variables to `/etc/environment.d/logos-nvidia.conf` to enable hardware acceleration and fix cursor rendering.
+
+#### Run the script
 
 ```bash
 cd /root/LogOS
-
-# Desktop environment + theme + GPU drivers
 sudo bash 06-desktop.sh
+```
 
-# Optional package categories
+This loads the selected theme palette, installs shared packages (Pipewire, fonts, GPU drivers), installs desktop-specific packages and login manager, deploys themed dotfiles to `~/.config/`, and enables the login manager service.
+
+### 14. Package Modules
+
+LogOS organizes optional software into seven categories, each controlled by a `LOGOS_PKG_*` toggle in `logos.conf`:
+
+| Category | Toggle | Key Packages |
+|----------|--------|-------------|
+| **Office** | `LOGOS_PKG_OFFICE` | LibreOffice, Thunderbird, Firefox, Chromium, Obsidian, Zotero |
+| **Development** | `LOGOS_PKG_DEV` | VS Code, Git, Python, Node.js, Docker |
+| **Security** | `LOGOS_PKG_SECURITY` | Wireshark, nmap, hashcat, Metasploit (AUR), Burp Suite (AUR) |
+| **Radio/SAR** | `LOGOS_PKG_RADIO` | GQRX, GNU Radio, Direwolf, Xastir, SDRangel (AUR) |
+| **Gaming** | `LOGOS_PKG_GAMING` | Steam, Lutris, Wine, MangoHud |
+| **Media** | `LOGOS_PKG_MEDIA` | VLC, mpv, OBS, Kdenlive, GIMP, Inkscape, Audacity |
+| **Engineering** | `LOGOS_PKG_ENGINEERING` | FreeCAD, OpenSCAD, KiCad, Blender, Fusion 360 (AUR) |
+
+#### AUR Trust Model
+
+Some packages (Metasploit, Burp Suite, Fusion 360, SDRangel, CHIRP) come from the Arch User Repository. AUR packages are:
+
+- **Not officially supported** by Arch Linux
+- **Built from source** on your machine (via `makepkg`)
+- **Community-maintained** — review PKGBUILDs before installing
+
+The script uses `yay` as the AUR helper, installed automatically when needed. AUR operations run as your unprivileged user (never root).
+
+#### Run the script
+
+```bash
 sudo bash 07-packages.sh
+```
 
-# Knowledge infrastructure (Cold Canon, Ollama, Kiwix)
+### 15. Knowledge Infrastructure
+
+The knowledge layer is what makes LogOS more than just another Arch install. It implements a three-tier information topology designed for resilience.
+
+#### Cold / Warm / Hot Topology
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  HOT WORKSPACE (/srv/hot-workspace)                              │
+│  Active work area. Fully mutable. Standard backup policies.      │
+├─────────────────────────────────────────────────────────────────┤
+│  WARM MESH (/srv/warm-mesh)                                      │
+│  Shared/syncing data (Syncthing). Mutable with version control.  │
+├─────────────────────────────────────────────────────────────────┤
+│  COLD CANON (/srv/cold-canon)                                    │
+│  Archival knowledge. Btrfs copies=2 for bitrot protection.       │
+│  Promotion pipeline: Hot → Warm → Cold (with review).            │
+│  Subdirs: documents/ software/ datasets/ media/                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Cold Canon** is the core of LogOS's knowledge preservation mission. Data here is stored with `copies=2` (Btrfs stores two copies of each extent), providing protection against silent data corruption. Think of it as your civilization's library — the content that must survive.
+
+#### Ollama (Local LLM)
+
+When `LOGOS_OLLAMA=1` in `logos.conf`, the script installs [Ollama](https://ollama.com/) and pulls the models specified in `LOGOS_OLLAMA_MODELS`. Default models:
+
+- `llama3.1:8b` — general-purpose reasoning
+- `qwen2.5:7b` — strong coding and multilingual
+- `mistral:7b` — fast inference, good for chat
+
+The `logos-assist` CLI tool provides a quick interface:
+
+```bash
+# Single query
+logos-assist "Explain the Btrfs copy-on-write mechanism"
+
+# Interactive mode
+logos-assist
+```
+
+#### Kiwix (Offline Documentation)
+
+[Kiwix](https://kiwix.org/) provides offline access to Wikipedia, Stack Overflow, Arch Wiki, and other knowledge bases via compressed ZIM files. Essential for operation without internet.
+
+#### Run the script
+
+```bash
 sudo bash 08-knowledge.sh
+```
 
-# Validate everything
+### 16. Validation & First Desktop Login
+
+#### Post-Build Validation
+
+The validation script runs read-only checks across every major subsystem:
+
+- **Boot:** UEFI mode, GRUB installed, all three kernels present
+- **Encryption:** LUKS active, `cryptdevice` in kernel command line
+- **Filesystem:** All 7 subvolumes mounted, zstd compression enabled, no Btrfs errors
+- **Security:** AppArmor enforcing, audit running, UFW active, kernel hardening applied
+- **Network:** NetworkManager active, firewall enabled
+- **Snapshots:** Snapper configured and running
+- **Knowledge:** Directory structure, Ollama service, branding files
+
+```bash
 sudo bash 09-validate.sh
 ```
 
-Reboot one more time to reach the desktop login.
+A clean build should show all passes with possible warnings for optional features (like Snapper, which requires manual configuration — see below).
 
-### 6. First Desktop Login
+#### Snapper Setup (After Validation)
+
+Configure automatic Btrfs snapshots:
+
+```bash
+# Install snapshot tools
+sudo pacman -S --needed snapper snap-pac grub-btrfs
+
+# Create root configuration
+sudo snapper -c root create-config /
+
+# Enable automatic snapshots
+sudo systemctl enable --now snapper-timeline.timer
+sudo systemctl enable --now snapper-cleanup.timer
+sudo systemctl enable --now grub-btrfsd.service
+```
+
+#### Reboot and Log In
+
+Reboot one more time to reach the desktop login:
+
+```bash
+reboot
+```
 
 | Desktop | What you'll see | Login action |
 |---------|----------------|-------------|
@@ -234,21 +620,9 @@ Reboot one more time to reach the desktop login.
 
 ---
 
-## Ringed City Boot Profiles
-
-Named after bosses from Dark Souls 3's *The Ringed City* DLC:
-
-| Profile | Kernel | Security | Use Case | Perf. Impact |
-|---------|--------|----------|----------|-------------|
-| **Gael** | linux-lts | Maximum — lockdown, no SMT, full LSM, init_on_alloc/free | Hostile environments, border crossings | ~15-30% |
-| **Midir** | linux-zen | Balanced — auto mitigations, AppArmor, audit | Daily driver, general use | ~2-5% |
-| **Halflight** | linux-zen | Minimal — mitigations off, no audit | Gaming, media production, HPC | None |
-
----
-
 ## Color Themes
 
-All three themes are applied at install time across every dotfile (terminal, bar, launcher, notifications, lock screen, GTK).
+All three themes are applied at install time across every dotfile (terminal, bar, launcher, notifications, lock screen, GTK). Themes use template substitution — dotfiles contain placeholders that are replaced with the selected palette's colors during `06-desktop.sh`.
 
 | Theme | Aesthetic | Background | Accent |
 |-------|-----------|-----------|--------|
@@ -256,7 +630,7 @@ All three themes are applied at install time across every dotfile (terminal, bar
 | **Catppuccin Mocha** | Warm pastels | `#1e1e2e` | `#cba6f7` |
 | **Dracula** | Classic dark | `#282a36` | `#bd93f9` |
 
-To switch themes, edit `LOGOS_THEME` in `logos.conf` and re-run `06-desktop.sh`.
+To switch themes after install, edit `LOGOS_THEME` in `logos.conf` and re-run `06-desktop.sh`.
 
 ---
 
@@ -308,7 +682,7 @@ VirtualBox/VMware: Create VM with 8 GB RAM, 120 GB disk, **UEFI firmware enabled
 ```
 LogOS-Arch/
 ├── docs/
-│   ├── build-guide.md              # Literate build guide (the full story)
+│   ├── build-guide.md              # Literate build guide (supplementary reference)
 │   └── appendices/
 │       ├── threat-model.md         # Threat model + security boundaries
 │       ├── hardware-compat.md      # Verified hardware + GPU matrix
@@ -360,6 +734,47 @@ LogOS-Arch/
 
 ---
 
+## Recovery
+
+If something goes wrong, boot from the Arch ISO and follow these steps:
+
+```bash
+# 1. Find your encrypted partition
+lsblk
+# Look for the partition layout you created:
+#   NVMe: /dev/nvme0n1p3  (third partition)
+#   SATA: /dev/sda3        (third partition)
+# The root partition is always the third (after EFI and boot).
+
+# 2. Open encrypted volume (use your actual partition, e.g., /dev/nvme0n1p3)
+cryptsetup open /dev/nvme0n1p3 cryptroot
+
+# 3. Mount root subvolume
+mount -o subvol=@ /dev/mapper/cryptroot /mnt
+
+# 4. Mount boot partitions (use your actual disk)
+#    Find them with: lsblk — they're partitions 1 (EFI) and 2 (boot)
+mount /dev/nvme0n1p2 /mnt/boot
+mount /dev/nvme0n1p1 /mnt/boot/efi
+
+# 5. Chroot in
+arch-chroot /mnt
+
+# 6. Fix the problem, for example:
+#    Regenerate initramfs:  mkinitcpio -P
+#    Reinstall GRUB:        grub-install --target=x86_64-efi --efi-directory=/boot/efi
+#    Rebuild GRUB config:   grub-mkconfig -o /boot/grub/grub.cfg
+
+# 7. Exit, unmount, reboot
+exit
+umount -R /mnt
+reboot
+```
+
+For detailed recovery procedures (GRUB rescue, encrypt hook failures, kernel panic, Btrfs corruption, snapshot rollback), see [Troubleshooting](docs/appendices/troubleshooting.md).
+
+---
+
 ## Troubleshooting
 
 **Can't boot the USB?** Check UEFI is enabled in BIOS/firmware. Disable Secure Boot if the ISO won't load.
@@ -370,14 +785,14 @@ LogOS-Arch/
 
 **Wrong disk in `logos.conf`?** Run `lsblk` to see all disks. NVMe drives are `/dev/nvme0n1`, SATA drives are `/dev/sda`.
 
-**Script fails mid-run?** Every script is re-runnable. Fix the issue and run it again. For chroot recovery, see [troubleshooting](docs/appendices/troubleshooting.md).
+**Script fails mid-run?** Every script is re-runnable. Fix the issue and run it again. For chroot recovery, see [Troubleshooting](docs/appendices/troubleshooting.md).
 
 **Hyprland won't start on NVIDIA?** The installer auto-configures NVIDIA Wayland env vars. If it still fails, check `/etc/environment.d/logos-nvidia.conf` exists. Fallback: set `LOGOS_DESKTOP=sway` or `LOGOS_DESKTOP=kde`.
 
 ---
 
-## Deep Dive
+## Appendices
 
-For the full rationale behind every design decision — why Argon2id over PBKDF2, why 7 subvolumes, why pre-boot security, how the Cold/Warm/Hot topology works — read the [Build Guide](docs/build-guide.md).
-
-For threat modeling, security boundaries, and profile selection criteria, see [Threat Model](docs/appendices/threat-model.md).
+- [Threat Model & Security Architecture](docs/appendices/threat-model.md) — Formal threat table, security boundaries, profile selection guide
+- [Hardware Compatibility](docs/appendices/hardware-compat.md) — Verified hardware, GPU decision matrix, known issues
+- [Troubleshooting](docs/appendices/troubleshooting.md) — Failure modes, recovery procedures, emergency quick reference
