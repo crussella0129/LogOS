@@ -1,0 +1,79 @@
+/* Rofi — LogOS launcher
+ * Theme: @@THEME_NAME@@ */
+
+configuration {
+    modi: "drun,run,window";
+    show-icons: true;
+    font: "JetBrains Mono 12";
+    display-drun: "Launch";
+    display-run: "Run";
+    display-window: "Window";
+}
+
+* {
+    bg:          @@THEME_BG@@;
+    bg-alt:      @@THEME_BG_ALT@@;
+    bg-hl:       @@THEME_BG_HIGHLIGHT@@;
+    fg:          @@THEME_FG@@;
+    fg-dim:      @@THEME_FG_DIM@@;
+    accent:      @@THEME_ACCENT@@;
+    red:         @@THEME_RED@@;
+    border-clr:  @@THEME_BORDER@@;
+
+    background-color: @bg;
+    text-color: @fg;
+}
+
+window {
+    width: 600px;
+    border: 2px solid;
+    border-color: @border-clr;
+    border-radius: 6px;
+    padding: 0;
+}
+
+mainbox {
+    children: [inputbar, listview];
+    spacing: 0;
+}
+
+inputbar {
+    background-color: @bg-alt;
+    padding: 12px;
+    children: [prompt, entry];
+}
+
+prompt {
+    text-color: @accent;
+    padding: 0 8px 0 0;
+}
+
+entry {
+    text-color: @fg;
+    placeholder: "Search...";
+    placeholder-color: @fg-dim;
+}
+
+listview {
+    lines: 8;
+    padding: 4px 0;
+    scrollbar: false;
+}
+
+element {
+    padding: 8px 12px;
+}
+
+element selected {
+    background-color: @bg-hl;
+    text-color: @accent;
+}
+
+element-text {
+    text-color: inherit;
+}
+
+element-icon {
+    size: 20px;
+    padding: 0 8px 0 0;
+}

@@ -1,0 +1,56 @@
+# Alacritty — LogOS terminal
+# Theme: @@THEME_NAME@@
+
+[font]
+size = 11.0
+
+[font.normal]
+family = "JetBrains Mono"
+style = "Regular"
+
+[font.bold]
+family = "JetBrains Mono"
+style = "Bold"
+
+[font.italic]
+family = "JetBrains Mono"
+style = "Italic"
+
+[window]
+padding = { x = 6, y = 6 }
+opacity = 0.95
+
+[scrolling]
+history = 10000
+
+[colors.primary]
+foreground = "@@THEME_FG@@"
+background = "@@THEME_BG@@"
+
+[colors.cursor]
+text = "@@THEME_BG@@"
+cursor = "@@THEME_ACCENT@@"
+
+[colors.selection]
+text = "@@THEME_BG@@"
+background = "@@THEME_ACCENT@@"
+
+[colors.normal]
+black   = "@@THEME_ANSI_BLACK@@"
+red     = "@@THEME_ANSI_RED@@"
+green   = "@@THEME_ANSI_GREEN@@"
+yellow  = "@@THEME_ANSI_YELLOW@@"
+blue    = "@@THEME_ANSI_BLUE@@"
+magenta = "@@THEME_ANSI_MAGENTA@@"
+cyan    = "@@THEME_ANSI_CYAN@@"
+white   = "@@THEME_ANSI_WHITE@@"
+
+[colors.bright]
+black   = "@@THEME_ANSI_BRIGHT_BLACK@@"
+red     = "@@THEME_ANSI_BRIGHT_RED@@"
+green   = "@@THEME_ANSI_BRIGHT_GREEN@@"
+yellow  = "@@THEME_ANSI_BRIGHT_YELLOW@@"
+blue    = "@@THEME_ANSI_BRIGHT_BLUE@@"
+magenta = "@@THEME_ANSI_BRIGHT_MAGENTA@@"
+cyan    = "@@THEME_ANSI_BRIGHT_CYAN@@"
+white   = "@@THEME_ANSI_BRIGHT_WHITE@@"

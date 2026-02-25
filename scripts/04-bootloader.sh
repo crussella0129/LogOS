@@ -1,85 +1,37 @@
 #!/usr/bin/env bash
-set -euo pipefail
+# 04-bootloader.sh — GRUB + Ringed City Profiles
+# Context: Run inside arch-chroot /mnt, after 03-chroot-setup.sh.
+# Installs GRUB, writes the Ringed City boot profile script, and
+# generates the GRUB configuration with baked-in LUKS/Btrfs UUIDs.
+#
+# Ported from: phase2-transform.sh:83-186 (GRUB config + profiles — primary source)
 
-if [[ "${EUID}" -ne 0 ]]; then
-  echo "Run as root."
-  exit 1
-fi
+LOGOS_SECTION="04-boot"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-log() { echo "[phase2] $*"; }
-install_pkgs() { pacman -S --noconfirm --needed "$@"; }
-
-log "Installing kernel trio"
-install_pkgs linux linux-headers linux-lts linux-lts-headers linux-zen linux-zen-headers
-if [[ "${ENABLE_HARDENED:-0}" == "1" ]]; then
-  install_pkgs linux-hardened linux-hardened-headers
-fi
-
-log "Installing security services"
-install_pkgs apparmor audit
-systemctl enable apparmor.service
-systemctl enable auditd.service
-
-log "Capturing UUIDs"
-if [[ -n "${CRYPT_UUID_OVERRIDE:-}" ]]; then
-  CRYPT_UUID="${CRYPT_UUID_OVERRIDE}"
+if [[ -f /root/LogOS/lib/common.sh ]]; then
+  source /root/LogOS/lib/common.sh
+  source /root/LogOS/lib/detect.sh
+  load_config /root/LogOS/logos.conf
 else
-  crypt_dev="$(blkid -t TYPE=crypto_LUKS -o device | head -n1 || true)"
-  if [[ -z "${crypt_dev}" ]]; then
-    echo "Unable to locate crypto_LUKS device. Set CRYPT_UUID_OVERRIDE." >&2
-    exit 1
-  fi
-  CRYPT_UUID="$(blkid -s UUID -o value "${crypt_dev}")"
+  source "${SCRIPT_DIR}/../lib/common.sh"
+  source "${SCRIPT_DIR}/../lib/detect.sh"
+  load_config "${SCRIPT_DIR}/../logos.conf"
 fi
 
-if [[ -n "${BTRFS_UUID_OVERRIDE:-}" ]]; then
-  BTRFS_UUID="${BTRFS_UUID_OVERRIDE}"
-else
-  root_dev="$(findmnt -n -o SOURCE / || true)"
-  if [[ -n "${root_dev}" ]]; then
-    BTRFS_UUID="$(blkid -s UUID -o value "${root_dev}" || true)"
-  else
-    BTRFS_UUID=""
-  fi
-  if [[ -z "${BTRFS_UUID}" ]]; then
-    btrfs_dev="$(blkid -t TYPE=btrfs -o device | head -n1 || true)"
-    if [[ -z "${btrfs_dev}" ]]; then
-      echo "Unable to locate btrfs UUID. Set BTRFS_UUID_OVERRIDE." >&2
-      exit 1
-    fi
-    BTRFS_UUID="$(blkid -s UUID -o value "${btrfs_dev}")"
-  fi
-fi
+require_root
+require_chroot
 
-printf '%s\n' "${CRYPT_UUID}" > /tmp/crypt_uuid
-printf '%s\n' "${BTRFS_UUID}" > /tmp/btrfs_uuid
+# ── Detect UUIDs ───────────────────────────────────────────────────
+log "Detecting disk UUIDs"
+CRYPT_UUID="$(detect_crypt_uuid)"
+BTRFS_UUID="$(detect_btrfs_uuid)"
+CRYPT_UUID_NO_DASH="${CRYPT_UUID//-/}"
 
-log "Configuring mkinitcpio"
-cat > /etc/mkinitcpio.conf << 'EOF'
-# LogOS mkinitcpio configuration
+log_ok "LUKS UUID:  ${CRYPT_UUID}"
+log_ok "Btrfs UUID: ${BTRFS_UUID}"
 
-MODULES=(btrfs)
-
-BINARIES=()
-
-FILES=()
-
-# encrypt must come before filesystems
-HOOKS=(base udev autodetect microcode modconf kms keyboard keymap consolefont block encrypt btrfs filesystems fsck)
-
-COMPRESSION="zstd"
-COMPRESSION_OPTIONS=(-9 -T0)
-EOF
-
-mkinitcpio -P
-
-log "Installing CPU microcode"
-if grep -q "GenuineIntel" /proc/cpuinfo; then
-  install_pkgs intel-ucode
-elif grep -q "AuthenticAMD" /proc/cpuinfo; then
-  install_pkgs amd-ucode
-fi
-
+# ── Write GRUB defaults ───────────────────────────────────────────
 log "Writing GRUB defaults"
 cat > /etc/default/grub << 'EOF'
 # LogOS GRUB configuration
@@ -95,14 +47,29 @@ GRUB_GFXMODE=auto
 GRUB_GFXPAYLOAD_LINUX=keep
 GRUB_TERMINAL_OUTPUT=gfxterm
 EOF
+log_ok "GRUB defaults written"
 
-CRYPT_UUID_NO_DASH="${CRYPT_UUID//-/}"
+# ── Install GRUB ──────────────────────────────────────────────────
+log "Installing GRUB to EFI"
+grub-install --target=x86_64-efi \
+  --efi-directory=/boot/efi \
+  --bootloader-id=LogOS
+log_ok "GRUB installed"
 
+# ── Write Ringed City profiles ─────────────────────────────────────
 log "Creating Ringed City GRUB profiles"
+
+# The heredoc is NOT quoted — variables expand at write time to bake in UUIDs.
 cat > /etc/grub.d/41_logos_profiles << EOF
 #!/bin/bash
 # LogOS Ringed City security profiles
+# UUIDs baked at install time — regenerate with grub-mkconfig if disks change.
 
+EOF
+
+# ── Gael [Maximum Security] ────────────────────────────────────────
+if [[ "${LOGOS_PROFILE_GAEL:-1}" == "1" ]]; then
+  cat >> /etc/grub.d/41_logos_profiles << EOF
 menuentry "LogOS - Gael [Maximum Security]" --class logos --class gnu-linux --class gnu --class os \$menuentry_id_option 'logos-gael' {
     load_video
     set gfxpayload=keep
@@ -119,6 +86,12 @@ menuentry "LogOS - Gael [Maximum Security]" --class logos --class gnu-linux --cl
     initrd /@/boot/initramfs-linux-lts.img
 }
 
+EOF
+fi
+
+# ── Midir [Daily Driver] ──────────────────────────────────────────
+if [[ "${LOGOS_PROFILE_MIDIR:-1}" == "1" ]]; then
+  cat >> /etc/grub.d/41_logos_profiles << EOF
 menuentry "LogOS - Midir [Daily Driver]" --class logos --class gnu-linux --class gnu --class os \$menuentry_id_option 'logos-midir' {
     load_video
     set gfxpayload=keep
@@ -135,6 +108,12 @@ menuentry "LogOS - Midir [Daily Driver]" --class logos --class gnu-linux --class
     initrd /@/boot/initramfs-linux-zen.img
 }
 
+EOF
+fi
+
+# ── Halflight [Performance] ───────────────────────────────────────
+if [[ "${LOGOS_PROFILE_HALFLIGHT:-1}" == "1" ]]; then
+  cat >> /etc/grub.d/41_logos_profiles << EOF
 menuentry "LogOS - Halflight [Performance]" --class logos --class gnu-linux --class gnu --class os \$menuentry_id_option 'logos-halflight' {
     load_video
     set gfxpayload=keep
@@ -151,6 +130,11 @@ menuentry "LogOS - Halflight [Performance]" --class logos --class gnu-linux --cl
     initrd /@/boot/initramfs-linux-zen.img
 }
 
+EOF
+fi
+
+# ── Recovery submenu ──────────────────────────────────────────────
+cat >> /etc/grub.d/41_logos_profiles << EOF
 submenu "LogOS Recovery Options" --class recovery {
     menuentry "Linux LTS - Fallback Initramfs" --class recovery {
         load_video
@@ -181,58 +165,13 @@ submenu "LogOS Recovery Options" --class recovery {
 EOF
 
 chmod +x /etc/grub.d/41_logos_profiles
+
+# ── Disable default 10_linux (our profiles replace it) ─────────────
 chmod -x /etc/grub.d/10_linux || true
 
+# ── Generate GRUB config ──────────────────────────────────────────
+log "Generating GRUB configuration"
 grub-mkconfig -o /boot/grub/grub.cfg
+log_ok "GRUB configured with Ringed City profiles"
 
-log "Applying sysctl hardening"
-cat > /etc/sysctl.d/99-logos-hardening.conf << 'EOF'
-# LogOS kernel hardening
-kernel.kptr_restrict = 2
-kernel.dmesg_restrict = 1
-kernel.perf_event_paranoid = 3
-kernel.sysrq = 0
-kernel.unprivileged_bpf_disabled = 1
-net.ipv4.conf.all.rp_filter = 1
-net.ipv4.conf.default.rp_filter = 1
-net.ipv4.conf.all.accept_redirects = 0
-net.ipv4.conf.default.accept_redirects = 0
-net.ipv4.conf.all.send_redirects = 0
-net.ipv4.conf.default.send_redirects = 0
-net.ipv4.icmp_echo_ignore_all = 0
-net.ipv4.tcp_syncookies = 1
-net.ipv4.tcp_rfc1337 = 1
-net.ipv6.conf.all.accept_redirects = 0
-net.ipv6.conf.default.accept_redirects = 0
-EOF
-
-log "Configuring firewall"
-install_pkgs ufw
-systemctl enable ufw.service
-ufw default deny incoming
-ufw default allow outgoing
-ufw --force enable
-
-log "Installing core utilities"
-install_pkgs btrfs-progs snapper snap-pac grub-btrfs htop btop neofetch fastfetch tree wget curl rsync openssh tmux zsh man-db man-pages texinfo
-
-systemctl enable NetworkManager.service
-systemctl enable grub-btrfsd.service
-
-log "Writing LogOS branding"
-cat > /etc/logos-release << 'EOF'
-NAME="LogOS"
-VERSION="2025.8"
-CODENAME="Ringed City"
-BASE="Arch Linux"
-ARCHITECTURE="x86_64"
-INSTALLATION_METHOD="archinstall"
-EOF
-
-cat > /etc/motd << 'EOF'
-Ontology Substrate OS - Ringed City Build
-Profiles: Gael (Security) | Midir (Balanced) | Halflight (Performance)
-"Knowledge preserved. Reason applied. Civilization continued."
-EOF
-
-log "Phase 2 complete. Reboot when ready."
+log_ok "Bootloader setup complete. Proceed to 05-security.sh"

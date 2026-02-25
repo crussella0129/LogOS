@@ -1,0 +1,29 @@
+# Mako — LogOS notifications (Sway)
+# Theme: @@THEME_NAME@@
+
+max-visible=5
+default-timeout=10000
+layer=overlay
+anchor=top-right
+
+font=JetBrains Mono 10
+width=350
+height=150
+margin=12
+padding=12
+border-size=2
+border-radius=6
+
+background-color=@@THEME_BG_ALT@@
+text-color=@@THEME_FG@@
+border-color=@@THEME_ACCENT@@
+
+[urgency=low]
+border-color=@@THEME_BORDER@@
+text-color=@@THEME_FG_DIM@@
+default-timeout=5000
+
+[urgency=critical]
+border-color=@@THEME_RED@@
+text-color=@@THEME_RED@@
+default-timeout=0

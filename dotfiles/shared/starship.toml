@@ -1,0 +1,42 @@
+# Starship prompt — LogOS
+# Theme: @@THEME_NAME@@
+
+format = """
+[┌─](@@THEME_FG_DIM@@)$username$hostname$directory$git_branch$git_status$cmd_duration
+[└─](@@THEME_FG_DIM@@)$character"""
+
+[username]
+format = "[$user]($style) "
+style_user = "@@THEME_ACCENT@@"
+style_root = "@@THEME_RED@@"
+show_always = false
+
+[hostname]
+format = "[@$hostname]($style) "
+style = "@@THEME_FG_DIM@@"
+ssh_only = true
+
+[directory]
+format = "[$path]($style)[$read_only]($read_only_style) "
+style = "@@THEME_BLUE@@"
+read_only = " RO"
+read_only_style = "@@THEME_RED@@"
+truncation_length = 3
+
+[git_branch]
+format = "[$symbol$branch]($style) "
+symbol = " "
+style = "@@THEME_GREEN@@"
+
+[git_status]
+format = "[$all_status$ahead_behind]($style) "
+style = "@@THEME_YELLOW@@"
+
+[cmd_duration]
+format = "[$duration]($style) "
+style = "@@THEME_FG_DIM@@"
+min_time = 2000
+
+[character]
+success_symbol = "[>](@@THEME_ACCENT@@)"
+error_symbol = "[>](@@THEME_RED@@)"

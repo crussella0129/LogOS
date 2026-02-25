@@ -1,0 +1,109 @@
+#!/usr/bin/env bash
+# logos.conf — LogOS build configuration
+# Copy this file to logos.conf and edit to match your hardware/preferences.
+# This file is sourced by every companion script (KEY=value, no spaces around =).
+
+# ╔═══════════════════════════════════════════════════════════════════╗
+# ║  1. DISK                                                         ║
+# ╚═══════════════════════════════════════════════════════════════════╝
+# Target disk — ALL DATA ON THIS DISK WILL BE DESTROYED.
+# Use 'lsblk' to identify. Examples: /dev/sda, /dev/nvme0n1, /dev/vda
+LOGOS_DISK="/dev/sda"
+
+# Partition sizes (EFI and Boot). Root uses the remainder.
+LOGOS_EFI_SIZE="1G"
+LOGOS_BOOT_SIZE="4G"
+
+# LUKS encryption (1=enable, 0=disable — disabling is NOT recommended)
+LOGOS_ENCRYPT=1
+
+# LUKS cipher parameters (defaults are strong; change only if you know why)
+LOGOS_LUKS_CIPHER="aes-xts-plain64"
+LOGOS_LUKS_KEY_SIZE="512"
+LOGOS_LUKS_HASH="sha512"
+LOGOS_LUKS_PBKDF="argon2id"
+
+# Btrfs mount options
+LOGOS_BTRFS_OPTS="noatime,compress=zstd:3,space_cache=v2,discard=async"
+
+# ╔═══════════════════════════════════════════════════════════════════╗
+# ║  2. SYSTEM                                                       ║
+# ╚═══════════════════════════════════════════════════════════════════╝
+LOGOS_HOSTNAME="logos"
+LOGOS_USERNAME="logos"
+LOGOS_TIMEZONE="America/New_York"
+LOGOS_LOCALE="en_US.UTF-8"
+LOGOS_KEYMAP="us"
+LOGOS_SHELL="/bin/bash"
+
+# ╔═══════════════════════════════════════════════════════════════════╗
+# ║  3. DESKTOP                                                      ║
+# ╚═══════════════════════════════════════════════════════════════════╝
+# Desktop environment: hyprland (default), kde, sway, i3
+LOGOS_DESKTOP="hyprland"
+
+# Color theme: ringed-city (default), catppuccin-mocha, dracula
+LOGOS_THEME="ringed-city"
+
+# Terminal emulator: kitty (default for hyprland), alacritty (default for sway/i3)
+# Leave empty to use the desktop default.
+LOGOS_TERMINAL=""
+
+# ╔═══════════════════════════════════════════════════════════════════╗
+# ║  4. KERNEL & PROFILES                                            ║
+# ╚═══════════════════════════════════════════════════════════════════╝
+# Install linux-hardened in addition to the default trio (linux, lts, zen)?
+LOGOS_ENABLE_HARDENED=0
+
+# Ringed City boot profiles (1=include in GRUB menu)
+LOGOS_PROFILE_GAEL=1
+LOGOS_PROFILE_MIDIR=1
+LOGOS_PROFILE_HALFLIGHT=1
+
+# ╔═══════════════════════════════════════════════════════════════════╗
+# ║  5. PACKAGES                                                     ║
+# ╚═══════════════════════════════════════════════════════════════════╝
+# Toggle optional package categories (1=install, 0=skip)
+LOGOS_PKG_OFFICE=1        # LibreOffice, Thunderbird, Firefox, Chromium, Obsidian, Zotero
+LOGOS_PKG_DEV=1           # VS Code, Git, Python, Node.js, Docker
+LOGOS_PKG_SECURITY=0      # Wireshark, nmap, hashcat, Metasploit (AUR), Burp Suite (AUR)
+LOGOS_PKG_RADIO=0         # GQRX, GNU Radio, Direwolf, Xastir, Fldigi, SDRangel (AUR)
+LOGOS_PKG_GAMING=0        # Steam, Lutris, Wine, MangoHud
+LOGOS_PKG_MEDIA=1         # VLC, mpv, OBS, Kdenlive, GIMP, Inkscape, Audacity
+LOGOS_PKG_ENGINEERING=0   # FreeCAD, OpenSCAD, KiCad, Blender, Fusion 360 (AUR)
+
+# ╔═══════════════════════════════════════════════════════════════════╗
+# ║  6. KNOWLEDGE                                                    ║
+# ╚═══════════════════════════════════════════════════════════════════╝
+# Ollama (local LLM inference engine)
+LOGOS_OLLAMA=1
+LOGOS_OLLAMA_MODELS="llama3.1:8b qwen2.5:7b mistral:7b"
+LOGOS_DEFAULT_MODEL="llama3.1:8b"
+
+# Kiwix (offline Wikipedia/documentation)
+LOGOS_KIWIX=1
+
+# ╔═══════════════════════════════════════════════════════════════════╗
+# ║  7. SECURITY                                                     ║
+# ╚═══════════════════════════════════════════════════════════════════╝
+# fail2ban (brute-force protection)
+LOGOS_FAIL2BAN=1
+
+# SSH daemon (1=enable sshd with hardened config, 0=no SSH server)
+LOGOS_SSHD=0
+
+# Allow SSH through firewall (only applies if LOGOS_SSHD=1)
+LOGOS_UFW_ALLOW_SSH=0
+
+# ╔═══════════════════════════════════════════════════════════════════╗
+# ║  8. OVERRIDES                                                    ║
+# ╚═══════════════════════════════════════════════════════════════════╝
+# Manual UUID overrides (leave empty for auto-detection)
+LOGOS_CRYPT_UUID_OVERRIDE=""
+LOGOS_BTRFS_UUID_OVERRIDE=""
+
+# Reflector mirror country (empty = skip mirror optimization)
+LOGOS_MIRROR_COUNTRY=""
+
+# Non-interactive mode (skip all confirmation prompts)
+LOGOS_NONINTERACTIVE=0

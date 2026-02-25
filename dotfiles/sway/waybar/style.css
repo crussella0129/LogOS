@@ -1,0 +1,80 @@
+/* Waybar — LogOS Sway bar
+ * Theme: @@THEME_NAME@@ */
+
+* {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 13px;
+    min-height: 0;
+}
+
+window#waybar {
+    background-color: @@THEME_BG_ALT@@;
+    color: @@THEME_FG@@;
+    border-bottom: 2px solid @@THEME_BORDER@@;
+}
+
+#workspaces button {
+    padding: 0 6px;
+    color: @@THEME_FG_DIM@@;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+}
+
+#workspaces button.focused {
+    color: @@THEME_ACCENT@@;
+    border-bottom: 2px solid @@THEME_ACCENT@@;
+}
+
+#workspaces button:hover {
+    background: @@THEME_BG_HIGHLIGHT@@;
+    color: @@THEME_FG_BRIGHT@@;
+}
+
+#mode {
+    color: @@THEME_YELLOW@@;
+    font-style: italic;
+    padding: 0 8px;
+}
+
+#window {
+    color: @@THEME_FG_DIM@@;
+    padding: 0 8px;
+}
+
+#clock {
+    color: @@THEME_FG@@;
+    font-weight: bold;
+}
+
+#cpu,
+#memory,
+#battery,
+#network,
+#pulseaudio,
+#tray {
+    padding: 0 8px;
+    color: @@THEME_FG@@;
+}
+
+#battery.warning {
+    color: @@THEME_YELLOW@@;
+}
+
+#battery.critical {
+    color: @@THEME_RED@@;
+}
+
+#network.disconnected {
+    color: @@THEME_RED@@;
+}
+
+#pulseaudio.muted {
+    color: @@THEME_FG_DIM@@;
+}
+
+tooltip {
+    background-color: @@THEME_BG@@;
+    border: 1px solid @@THEME_BORDER@@;
+    border-radius: 4px;
+}

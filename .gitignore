@@ -12,3 +12,11 @@
 
 pkg/
 src/
+
+# User configuration (contains machine-specific choices)
+logos.conf
+
+# Editor temp files
+*~
+*.swp
+*.swo
