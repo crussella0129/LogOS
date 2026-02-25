@@ -38,31 +38,57 @@ LogOS is a hardened, encrypted, offline-capable Arch Linux system with local LLM
 
 This walks you through a complete LogOS install on bare metal or VM from a USB flash drive.
 
-### 1. Prepare on Your Current Machine
+### 1. Prepare the USB with Ventoy
 
+[Ventoy](https://www.ventoy.net/) is a tool that makes a USB bootable and lets you drop ISO files onto it like a normal drive — no disk imaging, no risk of overwriting the wrong disk. Install it on your USB from another PC first.
+
+**On Windows:** Download `ventoy-x.x.x-windows.zip` from [ventoy.net](https://www.ventoy.net/en/download.html), extract, run `Ventoy2Disk.exe`, select your USB, click Install.
+
+**On Linux:** Download the tarball, extract, run `sudo bash VentoyWeb.sh`, open the browser URL, select your USB, click Install.
+
+After Ventoy is installed, the USB shows up as a normal drive. Copy the Arch ISO onto it:
+
+1. Download the [latest Arch ISO](https://archlinux.org/download/)
+2. *(Optional)* Verify it:
+   ```bash
+   sha256sum -c sha256sums.txt --ignore-missing
+   gpg --keyserver-options auto-key-retrieve --verify archlinux-x86_64.iso.sig
+   ```
+3. Copy `archlinux-x86_64.iso` to the USB (drag and drop or `cp`)
+
+That's it. The USB is now bootable.
+
+### 2. Get the Repo into the Live Environment
+
+You need the LogOS-Arch repo accessible from the Arch live session. Pick one:
+
+**Option A — Git clone after boot (recommended)**
+Network is already required for `pacstrap`, so cloning costs nothing extra:
 ```bash
-# Download and verify the Arch ISO
-wget https://mirrors.kernel.org/archlinux/iso/latest/archlinux-x86_64.iso
-wget https://mirrors.kernel.org/archlinux/iso/latest/archlinux-x86_64.iso.sig
-wget https://mirrors.kernel.org/archlinux/iso/latest/sha256sums.txt
-sha256sum -c sha256sums.txt --ignore-missing
-gpg --keyserver-options auto-key-retrieve --verify archlinux-x86_64.iso.sig
-
-# Write to USB (replace sdX — get this wrong and you destroy the wrong disk)
-lsblk
-sudo dd bs=4M if=archlinux-x86_64.iso of=/dev/sdX conv=fsync oflag=direct status=progress
-sync
+# After booting the Arch ISO and connecting to network:
+pacman -Sy --noconfirm git
+git clone https://github.com/crussella0129/LogOS-Arch.git
 ```
 
-Or use [Ventoy](https://ventoy.net/) to put multiple ISOs on one USB.
+**Option B — Second USB**
+Clone the repo onto a second USB from your current machine. After booting the Arch ISO, plug it in and mount:
+```bash
+lsblk                          # find the second USB (e.g., /dev/sdc1)
+mkdir /mnt/repo
+mount /dev/sdc1 /mnt/repo      # adjust device as needed
+cp -r /mnt/repo/LogOS-Arch .
+umount /mnt/repo
+```
 
-### 2. Clone the Repo (on the USB or another drive)
-
-You need the LogOS repo accessible from the live environment. Options:
-
-- **Clone onto a second USB** and mount it after booting
-- **Clone after booting** (requires network): `git clone https://github.com/crussella0129/LogOS-Arch.git`
-- **Pre-stage on the Arch ISO USB** using Ventoy's file partition
+**Option C — Ventoy USB with reserved partition (offline, everything on one stick)**
+During Ventoy installation, reserve space for a third partition (`-r SIZE_MB` on Linux, or the "Partition Style" option in the GUI). Format that partition as ext4, and copy the repo onto it from your current machine. After booting, the reserved partition is mountable (it's not the ISO partition, so it won't be busy):
+```bash
+lsblk                          # find the third partition (e.g., /dev/sda3)
+mkdir /mnt/repo
+mount /dev/sda3 /mnt/repo
+cp -r /mnt/repo/LogOS-Arch .
+umount /mnt/repo
+```
 
 ### 3. Configure `logos.conf`
 
