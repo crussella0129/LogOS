@@ -1,11 +1,8 @@
-# LogOS — kernel + LUKS integration USE flags
+# LogOS — kernel + LUKS integration USE flags (OpenRC, no systemd)
 # These ensure dracut builds initramfs with LUKS support and GRUB can boot it.
 
 # installkernel: use dracut (not genkernel) and grub (auto-update on kernel install)
 sys-kernel/installkernel dracut grub
-
-# systemd: enable cryptsetup support for /etc/crypttab
-sys-apps/systemd cryptsetup
 
 # grub: device-mapper support for encrypted root
 sys-boot/grub device-mapper

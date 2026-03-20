@@ -310,7 +310,7 @@ log "Btrfs UUID: ${BTRFS_UUID}"
 step 6 "Stage3 download + extract"
 
 # Find latest stage3 tarball URL
-LATEST_URL="${STAGE3_MIRROR}/latest-stage3-amd64-systemd.txt"
+LATEST_URL="${STAGE3_MIRROR}/latest-stage3-amd64-openrc.txt"
 log "Fetching latest stage3 list from ${LATEST_URL}"
 
 STAGE3_LINE="$(curl -sL "${LATEST_URL}" | grep -v '^#' | grep '\.tar' | head -n1)"
@@ -388,10 +388,10 @@ log "Configs deployed"
 
 # --- Generate dracut config ---
 cat > "${MNT}/tmp/dracut-logos.conf" <<DRACUT
-# /etc/dracut.conf.d/logos.conf — LUKS + Btrfs + systemd
+# /etc/dracut.conf.d/logos.conf — LUKS + Btrfs (OpenRC, no systemd)
 add_dracutmodules+=" crypt dm rootfs-block btrfs "
-add_dracutmodules+=" systemd systemd-initrd systemd-cryptsetup "
 install_items+=" /etc/crypttab "
+omit_dracutmodules+=" systemd systemd-initrd systemd-cryptsetup "
 hostonly="no"
 DRACUT
 
@@ -444,14 +444,14 @@ if [[ -n "${INSTALLED_GLIBC}" ]]; then
 fi
 
 # ---- Set profile ----
-# Phase A: plain systemd profile (no desktop — avoids pulling in GTK/Qt/KDE/GNOME)
+# Phase A: plain OpenRC profile (no desktop — avoids pulling in GTK/Qt/KDE/GNOME)
 log "Setting profile"
-PROFILE="$(eselect profile list | grep -P 'default/linux/amd64/23\.0/systemd\b' | grep -v 'desktop\|merged-usr' | grep -oP '\[\d+\]' | head -1 | tr -d '[]')"
+PROFILE="$(eselect profile list | grep -P 'default/linux/amd64/23\.0\b' | grep -v 'systemd\|desktop\|merged-usr' | grep -oP '\[\d+\]' | head -1 | tr -d '[]')"
 if [[ -n "${PROFILE}" ]]; then
     eselect profile set "${PROFILE}"
-    log "Profile set to default/linux/amd64/23.0/systemd"
+    log "Profile set to default/linux/amd64/23.0 (OpenRC)"
 else
-    die "Cannot find systemd profile"
+    die "Cannot find default OpenRC profile"
 fi
 
 # ---- @world update ----
@@ -533,19 +533,15 @@ grub-install --target=x86_64-efi --efi-directory=/boot/efi --removable \
 grub-mkconfig -o /boot/grub/grub.cfg || die "grub-mkconfig failed"
 log "GRUB installed and configured"
 
-# ---- Networking (systemd-networkd) ----
+# ---- Networking (dhcpcd + OpenRC) ----
 log "Configuring networking"
-mkdir -p /etc/systemd/network
-cat > /etc/systemd/network/20-wired.network <<NET
-[Match]
-Name=en*
+emerge net-misc/dhcpcd || die "dhcpcd install failed"
 
-[Network]
-DHCP=yes
-NET
+# Enable dhcpcd for all interfaces via OpenRC
+rc-update add dhcpcd default
 
-systemctl enable systemd-networkd.service
-systemctl enable systemd-resolved.service
+# Configure /etc/conf.d/hostname
+echo 'hostname="logos"' > /etc/conf.d/hostname
 
 # ---- Users ----
 log "Creating users"
@@ -553,9 +549,12 @@ echo "root:@ROOT_PASS@" | chpasswd
 useradd -m -G wheel -s /bin/bash "@USER_NAME@"
 echo "@USER_NAME@:@USER_PASS@" | chpasswd
 
-# ---- Serial console for QEMU testing ----
+# ---- Serial console for QEMU testing (OpenRC) ----
 log "Enabling serial console"
-systemctl enable serial-getty@ttyS0.service
+# Add agetty on ttyS0 to /etc/inittab for serial console
+if ! grep -q 'ttyS0' /etc/inittab 2>/dev/null; then
+    echo 's0:12345:respawn:/sbin/agetty -L 115200 ttyS0 vt100' >> /etc/inittab
+fi
 
 # ---- Success sentinel ----
 log "BUILD_OK"
