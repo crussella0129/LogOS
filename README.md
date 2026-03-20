@@ -250,7 +250,7 @@ LogOS uses a tiered installation strategy that minimizes the debugging surface i
 bash scripts/02-base-install.sh
 ```
 
-This runs `basestrap` for Tier 0, installs Tier 1 via `arch-chroot`, generates fstab with `fstabgen`, and copies the LogOS configuration into the new system at `/root/LogOS/`.
+This runs `basestrap` for Tier 0, installs Tier 1 via `artix-chroot`, generates fstab with `fstabgen`, and copies the LogOS configuration into the new system at `/root/LogOS/`.
 
 ### 8. Enter Chroot
 
@@ -722,9 +722,9 @@ LogOS-Artix/
 | 00 | `verify-env.sh` | UEFI, network, clock, keyring, mirrors | Live USB |
 | 01 | `disk-setup.sh` | Partition, LUKS2, Btrfs subvolumes | Live USB |
 | 02 | `base-install.sh` | basestrap Tier 0+1, fstab, copy LogOS to system | Live USB |
-| 03 | `chroot-setup.sh` | Timezone, locale, user, mkinitcpio | arch-chroot |
-| 04 | `bootloader.sh` | GRUB + Ringed City boot profiles | arch-chroot |
-| 05 | `security.sh` | sysctl, AppArmor, UFW, fail2ban, SSH | arch-chroot |
+| 03 | `chroot-setup.sh` | Timezone, locale, user, mkinitcpio | artix-chroot |
+| 04 | `bootloader.sh` | GRUB + Ringed City boot profiles | artix-chroot |
+| 05 | `security.sh` | sysctl, AppArmor, UFW, fail2ban, SSH | artix-chroot |
 | 06 | `desktop.sh` | Desktop + theme + GPU + Pipewire + fonts | Booted system |
 | 07 | `packages.sh` | 7 optional package categories | Booted system |
 | 08 | `knowledge.sh` | Cold Canon, Ollama, Kiwix, branding | Booted system |
@@ -786,6 +786,71 @@ For detailed recovery procedures (GRUB rescue, encrypt hook failures, kernel pan
 **Script fails mid-run?** Every script is re-runnable. Fix the issue and run it again. For chroot recovery, see [Troubleshooting](docs/appendices/troubleshooting.md).
 
 **Hyprland won't start on NVIDIA?** The installer auto-configures NVIDIA Wayland env vars. If it still fails, check `/etc/environment.d/logos-nvidia.conf` exists. Fallback: set `LOGOS_DESKTOP=sway` or `LOGOS_DESKTOP=kde`.
+
+---
+
+## Sovereign Compute
+
+LogOS is built for a world where software availability, distribution infrastructure, and upstream governance cannot be taken for granted. The following provisions ensure LogOS can sustain itself.
+
+### What to Cache Now
+
+While these resources are still freely available, acquire and store them in Cold Canon (`/srv/cold-canon/software/`):
+
+| Resource | Why | How |
+|----------|-----|-----|
+| **Artix ISO + repo snapshot** | Rebuild from scratch if mirrors disappear | `rsync` a mirror or use `pacman -Sw` to download without installing |
+| **Arch package cache** | Artix shares Arch repos; cache critical packages | Keep `/var/cache/pacman/pkg/` (@pkg subvol) populated |
+| **GCC/binutils/make source tarballs** | Bootstrap a compiler toolchain from source | Download from GNU FTP mirrors |
+| **Linux kernel source** | Build custom kernels without network | `git clone --bare` kernel.org |
+| **Kiwix ZIM files** | Wikipedia, Arch Wiki, Stack Overflow offline | Download from kiwix.org/library |
+| **Ollama model weights** | Local LLM with no cloud dependency | `ollama pull` caches in `~/.ollama/models/` |
+| **Rustup + Cargo registry** | Build Rust tools (ripgrep, fd, bat, etc.) | `rustup` offline installer + `cargo vendor` |
+| **Python + pip wheels** | Critical Python tools | `pip download` to a local directory |
+
+### Self-Hosting Verification
+
+After installation, verify the system can rebuild itself:
+
+```bash
+# Verify compiler toolchain
+gcc --version && g++ --version && make --version
+
+# Verify package manager works offline (with cached packages)
+pacman -S --noconfirm --needed base-devel  # should resolve from cache
+
+# Verify kernel can be rebuilt
+ls /usr/src/linux-*/  # kernel source should be present
+
+# Verify Btrfs tools for filesystem maintenance
+btrfs --version && btrfs scrub start -Bd /
+```
+
+### Package Cache Strategy
+
+The `@pkg` Btrfs subvolume at `/var/cache/pacman/pkg/` is kept separate so it persists across system snapshots. To pre-populate it for offline use:
+
+```bash
+# Download all currently-installed packages (without reinstalling)
+pacman -Sw $(pacman -Qqe)
+
+# Download a broader set of common packages
+pacman -Sw base-devel linux linux-headers linux-lts linux-zen \
+  grub efibootmgr btrfs-progs cryptsetup networkmanager \
+  gcc make cmake meson autoconf automake \
+  python python-pip nodejs npm git
+```
+
+### Replication Guide
+
+To clone the entire LogOS environment to another machine:
+
+1. Create an Artix live USB
+2. Copy the LogOS repo + `logos.conf` to the USB
+3. Copy `/var/cache/pacman/pkg/` to the USB (for offline install)
+4. Copy Cold Canon (`/srv/cold-canon/`) to the USB
+5. On the target machine, run the scripts from 00-09
+6. Restore Cold Canon content
 
 ---
 
