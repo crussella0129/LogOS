@@ -3,8 +3,7 @@
 # Context: Run on the booted system. Read-only — never modifies the system.
 # Runs pass/fail/warn checks across boot, encryption, filesystem, security,
 # kernel hardening, network, snapshots, and knowledge categories.
-#
-# Ported from: Master spec section 25 (validation suite)
+# OpenRC service checks — no systemd.
 
 LOGOS_SECTION="09-validate"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -25,19 +24,28 @@ PASS=0
 FAIL=0
 WARN=0
 
-pass() { printf '\033[0;32m  ✓ %s\033[0m\n' "$1"; ((PASS++)); }
-fail() { printf '\033[0;31m  ✗ %s\033[0m\n' "$1"; ((FAIL++)); }
-warn() { printf '\033[0;33m  ⚠ %s\033[0m\n' "$1"; ((WARN++)); }
+pass() { printf '\033[0;32m  PASS %s\033[0m\n' "$1"; ((PASS++)); }
+fail() { printf '\033[0;31m  FAIL %s\033[0m\n' "$1"; ((FAIL++)); }
+warn() { printf '\033[0;33m  WARN %s\033[0m\n' "$1"; ((WARN++)); }
 
 section() {
   echo ""
-  echo "━━━ $1 ━━━"
+  echo "--- $1 ---"
+}
+
+# OpenRC helpers
+rc_is_active() {
+  rc-service "$1" status >/dev/null 2>&1
+}
+
+rc_is_enabled() {
+  rc-update show 2>/dev/null | grep -q "$1"
 }
 
 echo ""
-echo "╔════════════════════════════════════════════════════════════╗"
-echo "║           LogOS System Validation Suite                    ║"
-echo "╚════════════════════════════════════════════════════════════╝"
+echo "================================================================"
+echo "           LogOS Artix System Validation Suite"
+echo "================================================================"
 
 # ── Boot Configuration ─────────────────────────────────────────────
 section "Boot Configuration"
@@ -48,6 +56,15 @@ section "Boot Configuration"
 [[ -f /boot/vmlinuz-linux-lts ]]               && pass "LTS kernel present"          || fail "LTS kernel missing"
 [[ -f /boot/vmlinuz-linux-zen ]]               && pass "Zen kernel present"          || fail "Zen kernel missing"
 [[ -f /boot/vmlinuz-linux-hardened ]]          && pass "Hardened kernel present"     || warn "Hardened kernel not installed (optional)"
+
+# ── Init System ──────────────────────────────────────────────────
+section "Init System"
+
+[[ "$(cat /proc/1/comm 2>/dev/null)" == "init" ]] || [[ "$(cat /proc/1/comm 2>/dev/null)" == "openrc-init" ]] \
+  && pass "OpenRC is PID 1"                     || fail "PID 1 is not OpenRC (got: $(cat /proc/1/comm 2>/dev/null))"
+command -v rc-service >/dev/null 2>&1           && pass "rc-service available"       || fail "rc-service not found"
+command -v rc-update >/dev/null 2>&1            && pass "rc-update available"        || fail "rc-update not found"
+! command -v systemctl >/dev/null 2>&1          && pass "No systemctl present"       || warn "systemctl found on system"
 
 # ── Encryption ─────────────────────────────────────────────────────
 section "Encryption"
@@ -64,8 +81,6 @@ mount | grep -q "subvol=/@snapshots"           && pass "Snapshots subvolume moun
 mount | grep -q "subvol=/@log"                 && pass "Log subvolume mounted"       || warn "Log subvolume not mounted"
 mount | grep -q "subvol=/@pkg"                 && pass "Package cache subvol mounted"|| warn "Package cache subvol not mounted"
 mount | grep -q "subvol=/@canon"               && pass "Cold Canon subvol mounted"   || warn "Cold Canon subvol not mounted"
-# Note: copies=2 is a btrfs filesystem property, not visible in mount output.
-# Check the @canon subvol exists and is mounted instead.
 [[ -d /srv/cold-canon/documents ]]             && pass "Cold Canon structure intact"  || warn "Cold Canon subdirs not found"
 mount | grep -q "compress=zstd"                && pass "Compression enabled"         || warn "Compression not detected"
 
@@ -73,13 +88,13 @@ mount | grep -q "compress=zstd"                && pass "Compression enabled"    
 errors=$(btrfs device stats / 2>/dev/null | grep -v ' 0$' | wc -l)
 [[ "${errors}" -eq 0 ]]                        && pass "No Btrfs errors"             || fail "${errors} Btrfs error counters non-zero"
 
-# ── Security Services ─────────────────────────────────────────────
+# ── Security Services (OpenRC) ───────────────────────────────────
 section "Security Services"
 
-systemctl is-active --quiet apparmor            && pass "AppArmor running"           || fail "AppArmor not running"
-systemctl is-active --quiet auditd              && pass "Audit daemon running"       || fail "Audit not running"
-systemctl is-active --quiet ufw                 && pass "UFW running"                || fail "UFW not running"
-systemctl is-active --quiet fail2ban 2>/dev/null && pass "fail2ban running"          || warn "fail2ban not running"
+rc_is_active apparmor                           && pass "AppArmor running"           || fail "AppArmor not running"
+rc_is_active auditd                             && pass "Audit daemon running"       || fail "Audit not running"
+rc_is_active ufw                                && pass "UFW running"                || fail "UFW not running"
+rc_is_active fail2ban 2>/dev/null                && pass "fail2ban running"          || warn "fail2ban not running"
 
 aa-status 2>/dev/null | grep -q "apparmor module is loaded" \
   && pass "AppArmor module loaded"              || fail "AppArmor module not loaded"
@@ -104,12 +119,12 @@ section "Kernel Hardening"
 # ── Network ────────────────────────────────────────────────────────
 section "Network"
 
-systemctl is-active --quiet NetworkManager      && pass "NetworkManager running"     || fail "NetworkManager not running"
+rc_is_active NetworkManager                     && pass "NetworkManager running"     || fail "NetworkManager not running"
 ufw status 2>/dev/null | grep -q "Status: active" \
   && pass "UFW firewall active"                 || fail "UFW not active"
 
 # ── SSH (if enabled) ──────────────────────────────────────────────
-if systemctl is-enabled --quiet sshd 2>/dev/null; then
+if rc_is_enabled sshd; then
   section "SSH Hardening"
   [[ -f /etc/ssh/sshd_config.d/10-logos.conf ]]  && pass "SSH hardening config present" || warn "SSH hardening config missing"
   grep -q "PermitRootLogin no" /etc/ssh/sshd_config.d/10-logos.conf 2>/dev/null \
@@ -121,10 +136,8 @@ fi
 # ── Snapshots ──────────────────────────────────────────────────────
 section "Snapshots"
 
-systemctl is-active --quiet snapper-timeline.timer 2>/dev/null \
-  && pass "Snapper timeline active"             || warn "Snapper timeline not active"
-systemctl is-active --quiet snapper-cleanup.timer 2>/dev/null \
-  && pass "Snapper cleanup active"              || warn "Snapper cleanup not active"
+# Snapper on OpenRC uses cron or a timer, not systemd timers
+command -v snapper >/dev/null 2>&1              && pass "Snapper installed"          || warn "Snapper not installed"
 snapper -c root list >/dev/null 2>&1            && pass "Snapper root config exists" || warn "Snapper not configured"
 
 # ── Desktop Environment ──────────────────────────────────────────
@@ -141,25 +154,21 @@ case "${_desktop}" in
   hyprland)
     command -v Hyprland >/dev/null 2>&1      && pass "Hyprland installed"         || fail "Hyprland not found"
     command -v waybar >/dev/null 2>&1         && pass "Waybar installed"           || fail "Waybar not found"
-    systemctl is-enabled --quiet greetd 2>/dev/null \
-      && pass "greetd enabled"               || fail "greetd not enabled"
+    rc_is_enabled greetd                     && pass "greetd enabled"             || fail "greetd not enabled"
     [[ -f /etc/greetd/config.toml ]]         && pass "greetd config present"      || fail "greetd config missing"
     ;;
   kde)
     command -v plasmashell >/dev/null 2>&1    && pass "KDE Plasma installed"       || fail "KDE Plasma not found"
-    systemctl is-enabled --quiet sddm 2>/dev/null \
-      && pass "SDDM enabled"                || fail "SDDM not enabled"
+    rc_is_enabled sddm                       && pass "SDDM enabled"              || fail "SDDM not enabled"
     ;;
   sway)
     command -v sway >/dev/null 2>&1           && pass "Sway installed"             || fail "Sway not found"
     command -v waybar >/dev/null 2>&1         && pass "Waybar installed"           || fail "Waybar not found"
-    systemctl is-enabled --quiet greetd 2>/dev/null \
-      && pass "greetd enabled"               || fail "greetd not enabled"
+    rc_is_enabled greetd                     && pass "greetd enabled"             || fail "greetd not enabled"
     ;;
   i3)
     command -v i3 >/dev/null 2>&1             && pass "i3 installed"               || fail "i3 not found"
-    systemctl is-enabled --quiet lightdm 2>/dev/null \
-      && pass "LightDM enabled"              || fail "LightDM not enabled"
+    rc_is_enabled lightdm                    && pass "LightDM enabled"            || fail "LightDM not enabled"
     ;;
 esac
 
@@ -185,23 +194,23 @@ section "Knowledge Infrastructure"
 [[ -d /srv/cold-canon ]]                        && pass "Cold Canon directory exists" || warn "Cold Canon not found"
 [[ -d /srv/warm-mesh ]]                         && pass "Warm Mesh directory exists"  || warn "Warm Mesh not found"
 [[ -d /srv/hot-workspace ]]                     && pass "Hot Workspace directory exists" || warn "Hot Workspace not found"
-systemctl is-active --quiet ollama 2>/dev/null  && pass "Ollama service running"     || warn "Ollama not running"
+rc_is_active ollama 2>/dev/null                 && pass "Ollama service running"     || warn "Ollama not running"
 [[ -f /etc/logos-release ]]                     && pass "LogOS branding present"     || warn "LogOS branding missing"
 
 # ── Summary ────────────────────────────────────────────────────────
 echo ""
-echo "════════════════════════════════════════════════════════════"
+echo "================================================================"
 printf "Results: \033[0;32m%d passed\033[0m, \033[0;31m%d failed\033[0m, \033[0;33m%d warnings\033[0m\n" "${PASS}" "${FAIL}" "${WARN}"
 echo ""
 
 if [[ "${FAIL}" -eq 0 ]]; then
   if [[ "${WARN}" -eq 0 ]]; then
-    echo "✓ System validation PASSED — all checks successful"
+    echo "System validation PASSED — all checks successful"
   else
-    echo "⚠ System validation PASSED with warnings"
+    echo "System validation PASSED with warnings"
   fi
   exit 0
 else
-  echo "✗ System validation FAILED — review issues above"
+  echo "System validation FAILED — review issues above"
   exit 1
 fi

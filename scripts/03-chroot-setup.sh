@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 # 03-chroot-setup.sh — System Identity + Initramfs
-# Context: Run inside arch-chroot /mnt, after 02-base-install.sh.
+# Context: Run inside artix-chroot /mnt, after 02-base-install.sh.
 # Configures timezone, locale, hostname, user, and mkinitcpio.
-#
-# Ported from: phase2-transform.sh:58-74 (mkinitcpio), master spec section 9
+# Uses OpenRC for service management — no systemd.
 
 LOGOS_SECTION="03-chroot"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -67,8 +66,6 @@ log "Set password for ${LOGOS_USERNAME}:"
 passwd "${LOGOS_USERNAME}"
 
 # ── Sudo for wheel group ──────────────────────────────────────────
-# Use a sudoers.d drop-in instead of editing /etc/sudoers directly.
-# This avoids corrupting the main sudoers file if interrupted.
 log "Enabling sudo for wheel group"
 echo "%wheel ALL=(ALL:ALL) ALL" > /etc/sudoers.d/wheel
 chmod 440 /etc/sudoers.d/wheel
@@ -77,7 +74,7 @@ log_ok "Sudo configured (via /etc/sudoers.d/wheel)"
 # ── mkinitcpio ─────────────────────────────────────────────────────
 log "Writing mkinitcpio.conf"
 cat > /etc/mkinitcpio.conf << 'EOF'
-# LogOS mkinitcpio configuration
+# LogOS Artix mkinitcpio configuration
 # encrypt MUST come before filesystems (order matters)
 
 MODULES=(btrfs)
@@ -96,11 +93,26 @@ log "Generating initramfs for all kernels"
 mkinitcpio -P
 log_ok "Initramfs generated"
 
-# ── Enable core services ──────────────────────────────────────────
-log "Enabling core services"
-systemctl enable NetworkManager.service
-systemctl enable apparmor.service
-systemctl enable auditd.service
-log_ok "Core services enabled"
+# ── Enable core services (OpenRC) ─────────────────────────────────
+log "Enabling core services via OpenRC"
+rc-update add NetworkManager default
+rc-update add elogind boot
+
+# AppArmor and audit — add if their init scripts exist
+if [[ -f /etc/init.d/apparmor ]]; then
+  rc-update add apparmor boot
+  log_ok "AppArmor enabled (boot runlevel)"
+else
+  log_warn "AppArmor init script not found — may need manual setup"
+fi
+
+if [[ -f /etc/init.d/auditd ]]; then
+  rc-update add auditd default
+  log_ok "Audit daemon enabled"
+else
+  log_warn "auditd init script not found — may need manual setup"
+fi
+
+log_ok "Core services enabled via OpenRC"
 
 log_ok "Chroot setup complete. Proceed to 04-bootloader.sh"

@@ -201,21 +201,21 @@ command = "tuigreet --time --remember --cmd ${session_cmd}"
 user = "greeter"
 GREETDEOF
 
-  systemctl enable greetd.service
+  rc-update add greetd default
   log_ok "greetd configured — session: ${session_cmd}"
 }
 
 # Configure SDDM for KDE Plasma.
 configure_sddm() {
   install_pkgs sddm
-  systemctl enable sddm.service
+  rc-update add sddm default
   log_ok "SDDM enabled"
 }
 
 # Configure LightDM for i3/X11.
 configure_lightdm() {
   install_pkgs lightdm lightdm-gtk-greeter
-  systemctl enable lightdm.service
+  rc-update add lightdm default
   log_ok "LightDM enabled"
 }
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 00-verify-env.sh — Live Environment Check
-# Context: Run from the Arch Linux live USB, before any disk operations.
+# Context: Run from the Artix Linux live USB, before any disk operations.
 # Verifies UEFI mode, network, clock sync, pacman keyring, and mirrors.
 
 LOGOS_SECTION="00-verify"
@@ -23,42 +23,50 @@ fi
 
 # ── Network connectivity ────────────────────────────────────────────
 log "Checking network connectivity"
-if ping -c 1 -W 5 archlinux.org >/dev/null 2>&1; then
+if ping -c 1 -W 5 artixlinux.org >/dev/null 2>&1; then
   log_ok "Network is reachable"
 else
-  log_err "No network connectivity. Connect via ethernet or iwctl."
+  log_err "No network connectivity. Connect via ethernet or connmanctl/iwctl."
   exit 1
 fi
 
 # ── System clock ────────────────────────────────────────────────────
+# No timedatectl on Artix (that's systemd). Use ntpd or chrony if available,
+# otherwise just sync hardware clock.
 log "Synchronizing system clock"
-timedatectl set-ntp true
-sleep 2
-if timedatectl status | grep -q "synchronized: yes"; then
-  log_ok "Clock synchronized via NTP"
+if command -v ntpd >/dev/null 2>&1; then
+  ntpd -q -g 2>/dev/null && log_ok "Clock synchronized via ntpd" || log_warn "ntpd sync failed"
+elif command -v chronyd >/dev/null 2>&1; then
+  chronyc makestep 2>/dev/null && log_ok "Clock synchronized via chrony" || log_warn "chrony sync failed"
+elif command -v sntp >/dev/null 2>&1; then
+  sntp -S pool.ntp.org 2>/dev/null && log_ok "Clock synchronized via sntp" || log_warn "sntp sync failed"
 else
-  log_warn "NTP sync not confirmed — clock may drift"
+  hwclock --systohc 2>/dev/null || true
+  log_warn "No NTP client found — clock may drift. Install ntp or chrony."
 fi
 
 # ── Pacman keyring ──────────────────────────────────────────────────
 log "Refreshing pacman keyring"
 pacman-key --init
-pacman-key --populate archlinux
-pacman -Sy --noconfirm archlinux-keyring
+pacman-key --populate artix
+pacman-key --populate archlinux 2>/dev/null || true
+pacman -Sy --noconfirm artix-keyring artix-archlinux-support 2>/dev/null || \
+  pacman -Sy --noconfirm artix-keyring
 log_ok "Keyring refreshed"
 
 # ── Mirror optimization (optional) ─────────────────────────────────
 load_config "${SCRIPT_DIR}/../logos.conf" || true
 
 if [[ -n "${LOGOS_MIRROR_COUNTRY:-}" ]]; then
-  log "Optimizing mirrors for ${LOGOS_MIRROR_COUNTRY}"
-  if command -v reflector >/dev/null 2>&1 || pacman -S --noconfirm reflector; then
-    reflector --country "${LOGOS_MIRROR_COUNTRY}" \
-              --protocol https \
-              --sort rate \
-              --latest 10 \
-              --save /etc/pacman.d/mirrorlist
-    log_ok "Mirrors optimized"
+  log "Mirror optimization for Artix"
+  # Artix does not use reflector (that's Arch-specific).
+  # Rank Artix mirrors by speed if rankmirrors is available.
+  if command -v rankmirrors >/dev/null 2>&1; then
+    cp /etc/pacman.d/mirrorlist /etc/pacman.d/mirrorlist.bak
+    rankmirrors -n 6 /etc/pacman.d/mirrorlist.bak > /etc/pacman.d/mirrorlist
+    log_ok "Artix mirrors ranked"
+  else
+    log_warn "rankmirrors not found — using default mirror order"
   fi
 else
   log "Skipping mirror optimization (LOGOS_MIRROR_COUNTRY not set)"
@@ -68,8 +76,9 @@ fi
 if [[ -f "${SCRIPT_DIR}/../logos.conf" ]]; then
   echo ""
   echo "════════════════════════════════════════════════════════════"
-  echo "  LogOS Build Configuration Summary"
+  echo "  LogOS Artix Build Configuration Summary"
   echo "════════════════════════════════════════════════════════════"
+  echo "  Base:       Artix Linux (OpenRC)"
   echo "  Disk:       ${LOGOS_DISK:-not set}"
   echo "  Hostname:   ${LOGOS_HOSTNAME:-not set}"
   echo "  Username:   ${LOGOS_USERNAME:-not set}"

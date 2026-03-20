@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# logos.conf — LogOS build configuration
+# logos.conf — LogOS Artix build configuration
 # Copy this file to logos.conf and edit to match your hardware/preferences.
 # This file is sourced by every companion script (KEY=value, no spaces around =).
+# Base: Artix Linux (OpenRC) — no systemd dependency.
 
 # ╔═══════════════════════════════════════════════════════════════════╗
 # ║  1. DISK                                                         ║
@@ -102,7 +103,7 @@ LOGOS_UFW_ALLOW_SSH=0
 LOGOS_CRYPT_UUID_OVERRIDE=""
 LOGOS_BTRFS_UUID_OVERRIDE=""
 
-# Reflector mirror country (empty = skip mirror optimization)
+# Artix mirror optimization (empty = skip)
 LOGOS_MIRROR_COUNTRY=""
 
 # Non-interactive mode (skip all confirmation prompts)

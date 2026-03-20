@@ -36,7 +36,7 @@ mount /dev/sdX2 /mnt/boot
 mount /dev/sdX1 /mnt/boot/efi
 
 # 4. Chroot
-arch-chroot /mnt
+artix-chroot /mnt
 
 # 5. [Fix the problem - see below]
 
@@ -87,10 +87,10 @@ mkinitcpio -P
 
 ```bash
 # Check NetworkManager
-systemctl status NetworkManager
+rc-service NetworkManager status
 
 # If failed, restart
-systemctl restart NetworkManager
+rc-service NetworkManager restart
 
 # Manual connection
 nmcli device status
@@ -116,7 +116,7 @@ mkinitcpio -P
 # Option 1: Disable Secure Boot in BIOS/UEFI settings
 
 # Option 2: Re-sign in chroot
-arch-chroot /mnt
+artix-chroot /mnt
 sbctl sign-all
 sbctl verify
 exit
@@ -130,11 +130,11 @@ sbctl reset
 ```bash
 # If dropped to emergency shell:
 
-# Check what failed
-systemctl --failed
+# Check what failed (OpenRC)
+rc-status --crashed
 
 # Disable problematic service
-systemctl disable problem-service
+rc-update del problem-service
 
 # Continue boot
 exit
@@ -192,7 +192,7 @@ reboot
 │ 3. mount -o subvol=@ /dev/mapper/cryptroot /mnt                   │
 │ 4. mount /dev/sdX2 /mnt/boot                                      │
 │ 5. mount /dev/sdX1 /mnt/boot/efi                                  │
-│ 6. arch-chroot /mnt                                               │
+│ 6. artix-chroot /mnt                                               │
 │ 7. [Fix the problem]                                              │
 │ 8. exit                                                            │
 │ 9. umount -R /mnt                                                 │

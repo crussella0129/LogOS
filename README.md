@@ -1,11 +1,11 @@
 # LogOS — Ontology Substrate Operating System
 
 **Version:** 2025.8 (Ringed City)
-**Base:** Arch Linux | **Arch:** x86_64 | **License:** GPLv3
+**Base:** Artix Linux (OpenRC) | **Arch:** x86_64 | **License:** GPLv3
 
 > *"A civilization does not collapse when it loses data. It collapses when it loses procedural knowledge."*
 
-LogOS is a hardened, encrypted, offline-capable Arch Linux system with Animus local LLM inference (<https://github.com/crussella0129/Animus>) and a three-tier knowledge preservation topology that includes the GitGael Survival Repo (<https://github.com/crussella0129/GitGael>). It ships with a cyberdeck-first desktop (Hyprland) with a theme and color scheme fitting the end of the world (from Dark Souls 3 at least).
+LogOS is a hardened, encrypted, offline-capable Artix Linux (OpenRC) system with Animus local LLM inference (<https://github.com/crussella0129/Animus>) and a three-tier knowledge preservation topology that includes the GitGael Survival Repo (<https://github.com/crussella0129/GitGael>). It ships with a cyberdeck-first desktop (Hyprland) with a theme and color scheme fitting the end of the world (from Dark Souls 3 at least). **No systemd** — LogOS uses OpenRC for init, elogind for session management, and plain shell scripts for service configuration.
 
 This document is the **source of truth** for building a LogOS system. Each section explains *what* you're doing and *why*, then gives the exact commands to run. The companion scripts automate each step; you can also use this guide as a reference for manual execution.
 
@@ -48,45 +48,40 @@ This walks you through a complete LogOS install on bare metal or VM from a USB f
 
 **On Linux:** Download the tarball, extract, run `sudo bash VentoyWeb.sh`, open the browser URL, select your USB, click Install.
 
-After Ventoy is installed, the USB shows up as a normal drive. Copy the Arch ISO onto it:
+After Ventoy is installed, the USB shows up as a normal drive. Copy the Artix ISO onto it:
 
-1. Download the [latest Arch ISO](https://archlinux.org/download/)
+1. Download the [latest Artix ISO (OpenRC base)](https://artixlinux.org/download.php)
+   - Choose the **base** OpenRC ISO (not the desktop editions)
 2. Verify it (a compromised installer is game over before you start):
    ```bash
-   # Download verification files from the same mirror
-   wget https://mirrors.kernel.org/archlinux/iso/latest/archlinux-x86_64.iso.sig
-   wget https://mirrors.kernel.org/archlinux/iso/latest/sha256sums.txt
-
-   # Verify checksum
-   sha256sum -c sha256sums.txt --ignore-missing
-
-   # Verify GPG signature
-   gpg --keyserver-options auto-key-retrieve --verify archlinux-x86_64.iso.sig
+   # Artix provides SHA256 checksums on the download page
+   sha256sum artix-base-openrc-*.iso
+   # Compare with the hash shown on artixlinux.org
    ```
-   If the GPG signature fails, **do not proceed**. Re-download from a different mirror.
-3. Copy `archlinux-x86_64.iso` to the USB (drag and drop or `cp`)
+   If the checksum doesn't match, **do not proceed**. Re-download.
+3. Copy `artix-base-openrc-*.iso` to the USB (drag and drop or `cp`)
 
 That's it. The USB is now bootable.
 
 ### 2. Get the Repo into the Live Environment
 
-You need the LogOS-Arch repo accessible from the Arch live session. Pick one:
+You need the LogOS repo accessible from the Artix live session. Pick one:
 
 **Option A — Git clone after boot (recommended)**
-Network is already required for `pacstrap`, so cloning costs nothing extra:
+Network is already required for `basestrap`, so cloning costs nothing extra:
 ```bash
-# After booting the Arch ISO and connecting to network:
+# After booting the Artix ISO and connecting to network:
 pacman -Sy --noconfirm git
-git clone https://github.com/crussella0129/LogOS-Arch.git
+git clone https://github.com/crussella0129/LogOS-Artix.git
 ```
 
 **Option B — Second USB**
-Clone the repo onto a second USB from your current machine. After booting the Arch ISO, plug it in and mount:
+Clone the repo onto a second USB from your current machine. After booting the Artix ISO, plug it in and mount:
 ```bash
 lsblk                          # find the second USB (e.g., /dev/sdc1)
 mkdir /mnt/repo
 mount /dev/sdc1 /mnt/repo      # adjust device as needed
-cp -r /mnt/repo/LogOS-Arch .
+cp -r /mnt/repo/LogOS-Artix .
 umount /mnt/repo
 ```
 
@@ -96,14 +91,14 @@ During Ventoy installation, reserve space for a third partition (`-r SIZE_MB` on
 lsblk                          # find the third partition (e.g., /dev/sda3)
 mkdir /mnt/repo
 mount /dev/sda3 /mnt/repo
-cp -r /mnt/repo/LogOS-Arch .
+cp -r /mnt/repo/LogOS-Artix .
 umount /mnt/repo
 ```
 
 ### 3. Configure `logos.conf`
 
 ```bash
-cd LogOS-Arch
+cd LogOS-Artix
 cp logos.conf.example logos.conf
 nano logos.conf    # or vim, whatever is available
 ```
@@ -139,9 +134,9 @@ nano logos.conf    # or vim, whatever is available
 
 **All other settings** (LUKS cipher, Btrfs mount options, kernel profiles, security toggles) have sane defaults. Review `logos.conf.example` for the full list.
 
-### 4. Boot the Arch ISO
+### 4. Boot the Artix ISO
 
-Boot your target machine from the USB. Select **"Arch Linux install medium (x86_64, UEFI)"**.
+Boot your target machine from the USB. Select the **Artix Linux** boot entry.
 
 If on WiFi:
 ```bash
@@ -159,12 +154,12 @@ Before touching any disk, verify that the live environment is ready.
 
 **What this checks and why:**
 - **UEFI mode** — LogOS requires UEFI for Secure Boot compatibility and the GPT partition scheme. Legacy BIOS is not supported.
-- **Network** — Required for downloading packages via `pacstrap`. Wired is simplest; wireless uses `iwctl`.
+- **Network** — Required for downloading packages via `basestrap`. Wired is simplest; wireless uses `iwctl`.
 - **Clock sync** — Incorrect time causes GPG signature verification failures during package installation.
 - **Pacman keyring** — Stale keyrings cause package installation failures. The script refreshes keys and optionally optimizes mirrors.
 
 ```bash
-cd LogOS-Arch
+cd LogOS-Artix
 bash scripts/00-verify-env.sh
 ```
 
@@ -255,14 +250,14 @@ LogOS uses a tiered installation strategy that minimizes the debugging surface i
 bash scripts/02-base-install.sh
 ```
 
-This runs `pacstrap` for Tier 0, installs Tier 1 via `arch-chroot`, generates fstab with `genfstab`, and copies the LogOS configuration into the new system at `/root/LogOS/`.
+This runs `basestrap` for Tier 0, installs Tier 1 via `arch-chroot`, generates fstab with `fstabgen`, and copies the LogOS configuration into the new system at `/root/LogOS/`.
 
 ### 8. Enter Chroot
 
 Now enter the new system to configure it before first boot:
 
 ```bash
-arch-chroot /mnt
+artix-chroot /mnt
 ```
 
 ### 9. Chroot Configuration
@@ -582,10 +577,14 @@ sudo pacman -S --needed snapper snap-pac grub-btrfs
 # Create root configuration
 sudo snapper -c root create-config /
 
-# Enable automatic snapshots
-sudo systemctl enable --now snapper-timeline.timer
-sudo systemctl enable --now snapper-cleanup.timer
-sudo systemctl enable --now grub-btrfsd.service
+# Enable automatic snapshots (OpenRC)
+# Snapper on OpenRC uses cron instead of systemd timers.
+# Install cronie and add snapper jobs:
+sudo rc-update add cronie default
+sudo rc-service cronie start
+# Add to /etc/cron.d/snapper:
+#   */15 * * * * root snapper -c root create --cleanup-algorithm timeline
+sudo rc-update add grub-btrfsd default 2>/dev/null || true
 ```
 
 #### Reboot and Log In
@@ -658,14 +657,14 @@ If you want to test without touching hardware:
 # Create disk image
 qemu-img create -f qcow2 logos-test.qcow2 120G
 
-# Boot with Arch ISO
+# Boot with Artix ISO
 qemu-system-x86_64 \
   -enable-kvm \
   -m 8192 \
   -cpu host \
   -smp 4 \
   -drive file=logos-test.qcow2,format=qcow2 \
-  -cdrom archlinux-x86_64.iso \
+  -cdrom artix-base-openrc-x86_64.iso \
   -boot d \
   -bios /usr/share/ovmf/OVMF.fd \
   -vga virtio \
@@ -673,14 +672,14 @@ qemu-system-x86_64 \
   -netdev user,id=net0
 ```
 
-VirtualBox/VMware: Create VM with 8 GB RAM, 120 GB disk, **UEFI firmware enabled**, attach the Arch ISO.
+VirtualBox/VMware: Create VM with 8 GB RAM, 120 GB disk, **UEFI firmware enabled**, attach the Artix ISO.
 
 ---
 
 ## Repository Structure
 
 ```
-LogOS-Arch/
+LogOS-Artix/
 ├── docs/
 │   └── appendices/
 │       ├── threat-model.md         # Threat model + security boundaries
@@ -689,7 +688,7 @@ LogOS-Arch/
 ├── scripts/
 │   ├── 00-verify-env.sh            # Live env checks
 │   ├── 01-disk-setup.sh            # Partition + LUKS + Btrfs
-│   ├── 02-base-install.sh          # pacstrap + fstab
+│   ├── 02-base-install.sh          # basestrap + fstab
 │   ├── 03-chroot-setup.sh          # System identity + initramfs
 │   ├── 04-bootloader.sh            # GRUB + Ringed City profiles
 │   ├── 05-security.sh              # Kernel hardening, firewall, SSH
@@ -722,7 +721,7 @@ LogOS-Arch/
 |---|--------|-------------|---------|
 | 00 | `verify-env.sh` | UEFI, network, clock, keyring, mirrors | Live USB |
 | 01 | `disk-setup.sh` | Partition, LUKS2, Btrfs subvolumes | Live USB |
-| 02 | `base-install.sh` | pacstrap Tier 0+1, fstab, copy LogOS to system | Live USB |
+| 02 | `base-install.sh` | basestrap Tier 0+1, fstab, copy LogOS to system | Live USB |
 | 03 | `chroot-setup.sh` | Timezone, locale, user, mkinitcpio | arch-chroot |
 | 04 | `bootloader.sh` | GRUB + Ringed City boot profiles | arch-chroot |
 | 05 | `security.sh` | sysctl, AppArmor, UFW, fail2ban, SSH | arch-chroot |
@@ -735,7 +734,7 @@ LogOS-Arch/
 
 ## Recovery
 
-If something goes wrong, boot from the Arch ISO and follow these steps:
+If something goes wrong, boot from the Artix ISO and follow these steps:
 
 ```bash
 # 1. Find your encrypted partition
@@ -757,7 +756,7 @@ mount /dev/nvme0n1p2 /mnt/boot
 mount /dev/nvme0n1p1 /mnt/boot/efi
 
 # 5. Chroot in
-arch-chroot /mnt
+artix-chroot /mnt
 
 # 6. Fix the problem, for example:
 #    Regenerate initramfs:  mkinitcpio -P

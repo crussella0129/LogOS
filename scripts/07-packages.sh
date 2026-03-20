@@ -60,8 +60,8 @@ fi
 
 if [[ "${LOGOS_PKG_DEV:-0}" == "1" ]]; then
   log "Installing: Development Tools"
-  install_pkgs code git python python-pip nodejs npm docker docker-compose
-  systemctl enable docker.service
+  install_pkgs code git python python-pip nodejs npm docker docker-compose docker-openrc
+  rc-update add docker default
   if id "${LOGOS_USERNAME}" >/dev/null 2>&1; then
     usermod -aG docker "${LOGOS_USERNAME}"
     log_ok "Added ${LOGOS_USERNAME} to docker group"

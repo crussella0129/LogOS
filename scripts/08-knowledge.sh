@@ -3,8 +3,7 @@
 # Context: Run on the booted system after 07-packages.sh.
 # Sets up knowledge infrastructure directories, Ollama, Kiwix,
 # the logos-assist CLI helper, and LogOS branding files.
-#
-# Ported from: phase4-knowledge.sh (direct port, expanded)
+# Uses OpenRC for service management — no systemd.
 
 LOGOS_SECTION="08-knowledge"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -44,8 +43,17 @@ if [[ "${LOGOS_OLLAMA:-0}" == "1" ]]; then
     log_warn "ollama not in repos — falling back to upstream installer"
     curl -fsSL https://ollama.com/install.sh | sh
   fi
-  systemctl enable ollama.service
-  systemctl start ollama.service
+
+  # Enable and start via OpenRC if init script exists, otherwise manual start
+  if [[ -f /etc/init.d/ollama ]]; then
+    rc-update add ollama default
+    rc-service ollama start
+  else
+    # Ollama upstream installer may create its own service management
+    ollama serve &>/dev/null &
+    sleep 2
+    log_warn "No OpenRC init script for ollama — started manually"
+  fi
 
   log "Pulling LLM models (this may take a while)"
   for model in ${LOGOS_OLLAMA_MODELS:-llama3.1:8b}; do
@@ -110,13 +118,14 @@ cat > /etc/logos-release << 'EOF'
 NAME="LogOS"
 VERSION="2025.8"
 CODENAME="Ringed City"
-BASE="Arch Linux"
+BASE="Artix Linux"
+INIT="OpenRC"
 ARCHITECTURE="x86_64"
 INSTALLATION_METHOD="literate-build"
 EOF
 
 cat > /etc/motd << 'EOF'
-Ontology Substrate OS — Ringed City Build
+Ontology Substrate OS — Ringed City Build (Artix/OpenRC)
 Profiles: Gael (Security) | Midir (Balanced) | Halflight (Performance)
 "Knowledge preserved. Reason applied. Civilization continued."
 EOF

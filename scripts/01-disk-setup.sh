@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 01-disk-setup.sh — Partitioning + Encryption + Btrfs Subvolumes
-# Context: Run from the Arch Linux live USB, after 00-verify-env.sh.
+# Context: Run from the Artix Linux live USB, after 00-verify-env.sh.
 # DESTRUCTIVE: Wipes the target disk. Requires explicit confirmation.
 #
 # Ported from: Master spec sections 6.3-6.8 (partition scheme, subvol layout)

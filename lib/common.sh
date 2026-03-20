@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# lib/common.sh — LogOS shared library
+# lib/common.sh — LogOS Artix shared library
 # Sourced by every companion script. Provides logging, config loading,
 # package helpers, environment checks, and error handling.
+# Artix Linux (OpenRC) — no systemd dependency.
 
 set -euo pipefail
 
@@ -82,15 +83,14 @@ require_root() {
 require_chroot() {
   # In a chroot, / has a different device number than /proc/1/root
   if [[ "$(stat -c %d:%i /)" == "$(stat -c %d:%i /proc/1/root 2>/dev/null)" ]]; then
-    log_err "This script must be run inside arch-chroot."
+    log_err "This script must be run inside artix-chroot."
     exit 1
   fi
 }
 
 require_live_env() {
-  if [[ ! -f /run/archiso/bootmnt/arch/boot/x86_64/vmlinuz-linux ]] && \
-     [[ ! -d /run/archiso ]]; then
-    log_warn "This does not appear to be an Arch live environment."
+  if [[ ! -d /run/artix ]] && [[ ! -f /etc/artix-release ]]; then
+    log_warn "This does not appear to be an Artix live environment."
     log_warn "Proceeding anyway — some checks may fail."
   fi
 }

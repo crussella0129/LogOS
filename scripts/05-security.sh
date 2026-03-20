@@ -2,8 +2,7 @@
 # 05-security.sh — Security Hardening
 # Context: Inside chroot OR booted system (auto-detects).
 # Applies sysctl hardening, AppArmor, audit, UFW, fail2ban, SSH hardening.
-#
-# Ported from: phase2-transform.sh:188-214 (sysctl + UFW), master spec section 8
+# Uses OpenRC for service management — no systemd.
 
 LOGOS_SECTION="05-security"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -56,8 +55,12 @@ log_ok "Sysctl hardening applied"
 
 # ── AppArmor + Audit ──────────────────────────────────────────────
 log "Enabling AppArmor and audit"
-systemctl enable apparmor.service 2>/dev/null || true
-systemctl enable auditd.service 2>/dev/null || true
+if [[ -f /etc/init.d/apparmor ]]; then
+  rc-update add apparmor boot 2>/dev/null || true
+fi
+if [[ -f /etc/init.d/auditd ]]; then
+  rc-update add auditd default 2>/dev/null || true
+fi
 
 # Write basic audit rules
 mkdir -p /etc/audit/rules.d
@@ -75,7 +78,9 @@ log_ok "AppArmor and audit configured"
 # ── UFW firewall ───────────────────────────────────────────────────
 log "Configuring UFW firewall"
 install_pkgs ufw 2>/dev/null || true
-systemctl enable ufw.service 2>/dev/null || true
+if [[ -f /etc/init.d/ufw ]]; then
+  rc-update add ufw default 2>/dev/null || true
+fi
 ufw default deny incoming
 ufw default allow outgoing
 
@@ -98,7 +103,7 @@ if [[ "${LOGOS_FAIL2BAN:-1}" == "1" ]]; then
 bantime  = 1h
 findtime = 10m
 maxretry = 5
-backend  = systemd
+backend  = auto
 
 [sshd]
 enabled = true
@@ -107,7 +112,9 @@ filter  = sshd
 maxretry = 3
 EOF
 
-  systemctl enable fail2ban.service 2>/dev/null || true
+  if [[ -f /etc/init.d/fail2ban ]]; then
+    rc-update add fail2ban default 2>/dev/null || true
+  fi
   log_ok "fail2ban configured"
 else
   log "fail2ban disabled in config — skipping"
@@ -133,7 +140,9 @@ ClientAliveInterval 300
 ClientAliveCountMax 2
 EOF
 
-  systemctl enable sshd.service 2>/dev/null || true
+  if [[ -f /etc/init.d/sshd ]]; then
+    rc-update add sshd default 2>/dev/null || true
+  fi
   log_ok "SSH hardened and enabled"
 else
   log "SSH daemon disabled in config — skipping"

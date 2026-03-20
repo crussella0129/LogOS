@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# 02-base-install.sh — pacstrap + fstab generation
-# Context: Run from the Arch Linux live USB, after 01-disk-setup.sh.
+# 02-base-install.sh — basestrap + fstab generation
+# Context: Run from the Artix Linux live USB, after 01-disk-setup.sh.
 # Installs Tier 0 (boot-critical) and Tier 1 (security) packages,
 # generates fstab, and copies LogOS config into the new system.
 #
-# Ported from: Master spec sections 7-8 (tier packages)
+# Artix uses basestrap (not pacstrap) and fstabgen (not genfstab).
 
 LOGOS_SECTION="02-base"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -31,15 +31,16 @@ case "${CPU_VENDOR}" in
 esac
 
 # ── Tier 0: Boot-critical packages ─────────────────────────────────
-log "Installing Tier 0 (boot-critical) packages via pacstrap"
+log "Installing Tier 0 (boot-critical) packages via basestrap"
 
 TIER0_PKGS=(
-  base linux linux-firmware linux-headers
+  base base-devel openrc elogind-openrc
+  linux linux-firmware linux-headers
   linux-lts linux-lts-headers
   linux-zen linux-zen-headers
   grub efibootmgr
-  btrfs-progs cryptsetup
-  networkmanager
+  btrfs-progs cryptsetup cryptsetup-openrc
+  networkmanager networkmanager-openrc
   sudo nano
   man-db man-pages
 )
@@ -52,24 +53,24 @@ if [[ "${LOGOS_ENABLE_HARDENED:-0}" == "1" ]]; then
   TIER0_PKGS+=(linux-hardened linux-hardened-headers)
 fi
 
-pacstrap -K /mnt "${TIER0_PKGS[@]}"
+basestrap /mnt "${TIER0_PKGS[@]}"
 log_ok "Tier 0 installed"
 
 # ── Tier 1: Security infrastructure ────────────────────────────────
 log "Installing Tier 1 (security) packages"
 
-TIER1_PKGS=(apparmor audit ufw openssh)
+TIER1_PKGS=(apparmor audit ufw openssh openssh-openrc)
 
 if [[ "${LOGOS_FAIL2BAN:-1}" == "1" ]]; then
   TIER1_PKGS+=(fail2ban)
 fi
 
-arch-chroot /mnt pacman -S --noconfirm --needed "${TIER1_PKGS[@]}"
+artix-chroot /mnt pacman -S --noconfirm --needed "${TIER1_PKGS[@]}"
 log_ok "Tier 1 installed"
 
 # ── Generate fstab ─────────────────────────────────────────────────
 log "Generating fstab"
-genfstab -U /mnt >> /mnt/etc/fstab
+fstabgen -U /mnt >> /mnt/etc/fstab
 
 # Note: Cold Canon's copies=2 redundancy is a btrfs filesystem-level property,
 # not a mount option. It is set by mkfs.btrfs --data dup or via btrfs property.
@@ -95,4 +96,4 @@ if [[ -d "${SCRIPT_DIR}/../dotfiles" ]]; then
   log "Dotfiles copied to /mnt/root/LogOS/dotfiles/"
 fi
 
-log_ok "Base install complete. Proceed to: arch-chroot /mnt, then run 03-chroot-setup.sh"
+log_ok "Base install complete. Proceed to: artix-chroot /mnt, then run 03-chroot-setup.sh"
