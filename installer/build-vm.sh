@@ -540,6 +540,9 @@ emerge net-misc/dhcpcd || die "dhcpcd install failed"
 # Enable dhcpcd for all interfaces via OpenRC
 rc-update add dhcpcd default
 
+# Enable dmcrypt service for /etc/crypttab handling (Gentoo Handbook)
+rc-update add dmcrypt boot
+
 # Configure /etc/conf.d/hostname
 echo 'hostname="logos"' > /etc/conf.d/hostname
 
@@ -560,10 +563,21 @@ fi
 log "BUILD_OK"
 CHROOT_SCRIPT
 
-# Substitute variables that can't use heredoc quoting
-sed -i "s/@ROOT_PASS@/${ROOT_PASS}/g" "${MNT}/tmp/chroot-build.sh"
-sed -i "s/@USER_NAME@/${USER_NAME}/g" "${MNT}/tmp/chroot-build.sh"
-sed -i "s/@USER_PASS@/${USER_PASS}/g" "${MNT}/tmp/chroot-build.sh"
+# Write credentials to a sourced file instead of sed substitution.
+# sed breaks on passwords containing / & \ characters.
+cat > "${MNT}/tmp/credentials.env" <<CREDS_EOF
+ROOT_PASS='$(printf '%s' "${ROOT_PASS}" | sed "s/'/'\\\\''/g")'
+USER_NAME='$(printf '%s' "${USER_NAME}" | sed "s/'/'\\\\''/g")'
+USER_PASS='$(printf '%s' "${USER_PASS}" | sed "s/'/'\\\\''/g")'
+CREDS_EOF
+chmod 600 "${MNT}/tmp/credentials.env"
+
+# Patch the chroot script to source credentials instead of using placeholders
+sed -i '1a source /tmp/credentials.env' "${MNT}/tmp/chroot-build.sh"
+# Replace placeholder references with variable references
+sed -i 's/@ROOT_PASS@/${ROOT_PASS}/g' "${MNT}/tmp/chroot-build.sh"
+sed -i 's/@USER_NAME@/${USER_NAME}/g' "${MNT}/tmp/chroot-build.sh"
+sed -i 's/@USER_PASS@/${USER_PASS}/g' "${MNT}/tmp/chroot-build.sh"
 
 chmod +x "${MNT}/tmp/chroot-build.sh"
 
