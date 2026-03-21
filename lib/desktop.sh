@@ -188,7 +188,7 @@ install_gpu_drivers() {
 configure_greetd() {
   local session_cmd="${1:?configure_greetd requires a session command}"
 
-  install_pkgs greetd greetd-tuigreet
+  install_pkgs greetd greetd-tuigreet greetd-openrc
 
   mkdir -p /etc/greetd
 
@@ -207,14 +207,14 @@ GREETDEOF
 
 # Configure SDDM for KDE Plasma.
 configure_sddm() {
-  install_pkgs sddm
+  install_pkgs sddm sddm-openrc
   rc-update add sddm default
   log_ok "SDDM enabled"
 }
 
 # Configure LightDM for i3/X11.
 configure_lightdm() {
-  install_pkgs lightdm lightdm-gtk-greeter
+  install_pkgs lightdm lightdm-gtk-greeter lightdm-openrc
   rc-update add lightdm default
   log_ok "LightDM enabled"
 }

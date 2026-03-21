@@ -94,25 +94,11 @@ mkinitcpio -P
 log_ok "Initramfs generated"
 
 # ── Enable core services (OpenRC) ─────────────────────────────────
+# Only networking and session management here. Security services
+# (apparmor, auditd, ufw, fail2ban, sshd) are enabled in 05-security.sh.
 log "Enabling core services via OpenRC"
 rc-update add NetworkManager default
 rc-update add elogind boot
-
-# AppArmor and audit — add if their init scripts exist
-if [[ -f /etc/init.d/apparmor ]]; then
-  rc-update add apparmor boot
-  log_ok "AppArmor enabled (boot runlevel)"
-else
-  log_warn "AppArmor init script not found — may need manual setup"
-fi
-
-if [[ -f /etc/init.d/auditd ]]; then
-  rc-update add auditd default
-  log_ok "Audit daemon enabled"
-else
-  log_warn "auditd init script not found — may need manual setup"
-fi
-
-log_ok "Core services enabled via OpenRC"
+log_ok "Core services enabled (NetworkManager, elogind)"
 
 log_ok "Chroot setup complete. Proceed to 04-bootloader.sh"

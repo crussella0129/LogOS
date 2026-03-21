@@ -26,7 +26,7 @@ Extracted from the LogOS Master Specification. This appendix covers failure mode
 All recovery starts the same way:
 
 ```bash
-# 1. Boot from Arch Linux ISO
+# 1. Boot from Artix Linux ISO
 # 2. Open encrypted volume
 cryptsetup open /dev/sdX3 cryptroot
 
@@ -187,7 +187,7 @@ reboot
 ┌────────────────────────────────────────────────────────────────────┐
 │                    LogOS EMERGENCY RECOVERY                        │
 ├────────────────────────────────────────────────────────────────────┤
-│ 1. Boot Arch Linux USB                                             │
+│ 1. Boot Artix Linux USB                                            │
 │ 2. cryptsetup open /dev/sdX3 cryptroot                            │
 │ 3. mount -o subvol=@ /dev/mapper/cryptroot /mnt                   │
 │ 4. mount /dev/sdX2 /mnt/boot                                      │

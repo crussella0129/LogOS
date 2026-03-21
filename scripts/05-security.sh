@@ -77,7 +77,7 @@ log_ok "AppArmor and audit configured"
 
 # ── UFW firewall ───────────────────────────────────────────────────
 log "Configuring UFW firewall"
-install_pkgs ufw 2>/dev/null || true
+install_pkgs ufw ufw-openrc 2>/dev/null || true
 if [[ -f /etc/init.d/ufw ]]; then
   rc-update add ufw default 2>/dev/null || true
 fi
@@ -95,7 +95,7 @@ log_ok "UFW configured (default deny incoming, allow outgoing)"
 # ── fail2ban ───────────────────────────────────────────────────────
 if [[ "${LOGOS_FAIL2BAN:-1}" == "1" ]]; then
   log "Configuring fail2ban"
-  install_pkgs fail2ban 2>/dev/null || true
+  install_pkgs fail2ban fail2ban-openrc 2>/dev/null || true
 
   mkdir -p /etc/fail2ban/jail.d
   cat > /etc/fail2ban/jail.d/logos.conf << 'EOF'

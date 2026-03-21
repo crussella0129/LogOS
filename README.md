@@ -110,7 +110,7 @@ nano logos.conf    # or vim, whatever is available
 | `LOGOS_DISK` | Target disk (e.g., `/dev/nvme0n1`, `/dev/sda`) | `lsblk` — NVMe drives show as `nvme0n1`, SATA as `sda` |
 | `LOGOS_HOSTNAME` | Machine name (e.g., `logos`, `citadel`) | Your choice — alphanumeric, no spaces |
 | `LOGOS_USERNAME` | Your login username (e.g., `ashen`) | Your choice — lowercase, no spaces |
-| `LOGOS_TIMEZONE` | Timezone (e.g., `America/New_York`) | `timedatectl list-timezones \| grep America` |
+| `LOGOS_TIMEZONE` | Timezone (e.g., `America/New_York`) | `ls /usr/share/zoneinfo/America/` |
 
 **Desktop and theme (optional, defaults shown):**
 
@@ -572,7 +572,7 @@ Configure automatic Btrfs snapshots:
 
 ```bash
 # Install snapshot tools
-sudo pacman -S --needed snapper snap-pac grub-btrfs
+sudo pacman -S --needed snapper snap-pac grub-btrfs cronie cronie-openrc
 
 # Create root configuration
 sudo snapper -c root create-config /

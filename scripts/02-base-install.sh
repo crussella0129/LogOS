@@ -59,10 +59,10 @@ log_ok "Tier 0 installed"
 # ── Tier 1: Security infrastructure ────────────────────────────────
 log "Installing Tier 1 (security) packages"
 
-TIER1_PKGS=(apparmor audit ufw openssh openssh-openrc)
+TIER1_PKGS=(apparmor apparmor-openrc audit audit-openrc ufw ufw-openrc openssh openssh-openrc)
 
 if [[ "${LOGOS_FAIL2BAN:-1}" == "1" ]]; then
-  TIER1_PKGS+=(fail2ban)
+  TIER1_PKGS+=(fail2ban fail2ban-openrc)
 fi
 
 artix-chroot /mnt pacman -S --noconfirm --needed "${TIER1_PKGS[@]}"

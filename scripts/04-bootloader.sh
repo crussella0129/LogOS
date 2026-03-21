@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 04-bootloader.sh — GRUB + Ringed City Profiles
-# Context: Run inside arch-chroot /mnt, after 03-chroot-setup.sh.
+# Context: Run inside artix-chroot /mnt, after 03-chroot-setup.sh.
 # Installs GRUB, writes the Ringed City boot profile script, and
 # generates the GRUB configuration with baked-in LUKS/Btrfs UUIDs.
 #
